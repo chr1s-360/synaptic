@@ -23,7 +23,8 @@
       "cache": false,
       "persistent": true,
       "passThroughEnv": [
-        "DATABASE_URL"
+        "DATABASE_URL",
+        "JWT_SECRET"
       ]
     },
     "db:generate": {

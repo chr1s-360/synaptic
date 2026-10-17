@@ -31,6 +31,7 @@ services:
       - postgres # Start after the database
     environment:
       - DATABASE_URL=postgres://postgres:postgres@postgres:5432/hackathon # Hardcoded database credentials are usually a no-go, but totally fine in this situation
+      - JWT_SECRET=${JWT_SECRET:-dev-only-change-me} # Override with a long random value via a root .env file or your shell
     develop:
       watch:
         - action: sync # Synchronize the files on your host ./apps/api with your containers /app/apps/api when any file changes in that path
