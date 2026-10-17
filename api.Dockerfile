@@ -25,5 +25,5 @@ RUN pnpm install --frozen-lockfile
 
 # Build the project
 COPY --from=builder /app/out/full/ .
-# We could properly build the project here, but we don't need to because this isnt for production :)
-CMD pnpm dlx turbo run dev --filter=api
+# Generate Prisma Client and start API server
+CMD pnpm --filter database db:generate && pnpm dlx turbo run dev --filter=api

@@ -26,4 +26,4 @@ RUN pnpm install --frozen-lockfile
 
 # Build the project
 COPY --from=builder /app/out/full/ .
-CMD pnpm dlx turbo run dev --filter=web
+CMD pnpm --filter database db:generate && pnpm dlx turbo run dev --filter=web

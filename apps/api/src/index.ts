@@ -10,7 +10,7 @@ import client, { User } from "database";
  */
 
 const app = new Hono();
-const PORT = 3001;
+const PORT = 3000;
 
 app.use(
   "*",
