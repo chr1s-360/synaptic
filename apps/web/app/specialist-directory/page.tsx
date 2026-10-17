@@ -1,127 +1,101 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import Link from "next/link";
 import { Button } from "@ui/components/ui/button";
-import { Input } from "@ui/components/ui/input";
-import { SynapticLogo } from "../logo";
 import {
-  Clock,
-  Car,
-  Navigation,
-  MapPin,
-  Search,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@ui/components/ui/dropdown-menu";
+import { Input } from "@ui/components/ui/input";
+import {
   AlertTriangle,
-  Building2,
-  User2,
-  ShieldCheck,
+  ChevronDown,
+  MapPin,
   PhoneCall,
+  Search,
   Activity,
   SlidersHorizontal,
-  BadgeCheck,
-  Stethoscope,
+  User2,
 } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { SynapticLogo } from "../logo";
 
-interface HospitalItem {
-  id: string;
-  name: string;
-  address: string;
-  phone: string;
-  distanceMiles: number;
-  driveTimeMin: number;
-  waitTimeMin: number;
-  erLevel: "Level 1 Trauma" | "Level 2 Trauma" | "Community Emergency";
-  rating: number;
-  availableBeds: number;
-  specialties: string[];
+interface Specialist {
+  id: number;
+  displayName: string;
+  specialty: string;
+  languages: string[];
+  location: string | null;
+  acceptingNewPatients: boolean;
 }
 
-const SAMPLE_HOSPITALS: HospitalItem[] = [
-  {
-    id: "1",
-    name: "Memorial Medical Center",
-    address: "742 Evergreen Terrace, Metro Area",
-    phone: "(555) 234-5678",
-    distanceMiles: 4.2,
-    driveTimeMin: 12,
-    waitTimeMin: 18,
-    erLevel: "Level 1 Trauma",
-    rating: 4.8,
-    availableBeds: 14,
-    specialties: ["Cardiac Care", "Pediatrics", "Trauma", "Stroke Unit"],
-  },
-  {
-    id: "2",
-    name: "Saint Jude Community Hospital",
-    address: "1204 Pine Valley Rd, Downtown",
-    phone: "(555) 876-5432",
-    distanceMiles: 2.1,
-    driveTimeMin: 8,
-    waitTimeMin: 45,
-    erLevel: "Level 2 Trauma",
-    rating: 4.4,
-    availableBeds: 6,
-    specialties: ["General ER", "Orthopedics", "Urgent Surgery"],
-  },
-  {
-    id: "3",
-    name: "Westside Emergency & Trauma Pavilion",
-    address: "880 Ocean Avenue, West District",
-    phone: "(555) 345-9871",
-    distanceMiles: 7.8,
-    driveTimeMin: 16,
-    waitTimeMin: 12,
-    erLevel: "Level 1 Trauma",
-    rating: 4.9,
-    availableBeds: 21,
-    specialties: ["Comprehensive Stroke", "Burn Center", "Cardiology"],
-  },
-  {
-    id: "4",
-    name: "Northview Urgent Health Center",
-    address: "3100 Highland Park Blvd, North Shore",
-    phone: "(555) 654-2109",
-    distanceMiles: 5.5,
-    driveTimeMin: 14,
-    waitTimeMin: 35,
-    erLevel: "Community Emergency",
-    rating: 4.2,
-    availableBeds: 8,
-    specialties: ["Rapid Diagnostics", "Pediatrics", "Minor Fractures"],
-  },
-];
+async function getSpecialists(): Promise<Specialist[]> {
+  const response = await fetch("http://localhost:3001/api/specialists", {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load specialists (${response.status})`);
+  }
+
+  return response.json();
+}
 
 export default function Page() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [userLocation, setUserLocation] = useState("Current Location (detected)");
-  const [sortBy, setSortBy] = useState<"totalTime" | "waitTime" | "driveTime">("totalTime");
-  const [severityFilter, setSeverityFilter] = useState<"all" | "level1" | "pediatric">("all");
+  const [language, setLanguage] = useState("All Languages");
+  const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
+  const [acceptingOnly, setAcceptingOnly] = useState(false);
+  const [specialists, setSpecialists] = useState<Specialist[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredHospitals = useMemo(() => {
-    return SAMPLE_HOSPITALS.filter((h) => {
+  useEffect(() => {
+    let isMounted = true;
+
+    getSpecialists()
+      .then((results) => {
+        if (isMounted) {
+          setSpecialists(results);
+          setAvailableLanguages(
+            Array.from(new Set(results.flatMap((specialist) => specialist.languages))).sort()
+          );
+          setLoading(false);
+        }
+      })
+      .catch((requestError: unknown) => {
+        if (isMounted) {
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : "Failed to load specialists"
+          );
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filteredSpecialists = useMemo(() => {
+    return specialists.filter((specialist) => {
+      const query = searchQuery.toLowerCase();
       const matchesSearch =
-        h.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        h.specialties.some((s) => s.toLowerCase().includes(searchQuery.toLowerCase()));
+        specialist.displayName.toLowerCase().includes(query) ||
+        specialist.specialty.toLowerCase().includes(query);
+      const matchesLanguage =
+        language === "All Languages" || specialist.languages.includes(language);
+      const matchesAvailability =
+        !acceptingOnly || specialist.acceptingNewPatients;
 
-      if (severityFilter === "level1") {
-        return matchesSearch && h.erLevel === "Level 1 Trauma";
-      }
-      if (severityFilter === "pediatric") {
-        return matchesSearch && h.specialties.includes("Pediatrics");
-      }
-      return matchesSearch;
-    }).sort((a, b) => {
-      if (sortBy === "totalTime") {
-        return a.driveTimeMin + a.waitTimeMin - (b.driveTimeMin + b.waitTimeMin);
-      }
-      if (sortBy === "waitTime") {
-        return a.waitTimeMin - b.waitTimeMin;
-      }
-      return a.driveTimeMin - b.driveTimeMin;
+      return matchesSearch && matchesLanguage && matchesAvailability;
     });
-  }, [searchQuery, sortBy, severityFilter]);
-
-  const bestChoice = filteredHospitals[0];
+  }, [specialists, searchQuery, language, acceptingOnly]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -208,50 +182,59 @@ export default function Page() {
                 <span className="text-slate-400 font-medium flex items-center gap-1 mr-1">
                   <SlidersHorizontal className="h-3 w-3" /> Filters:
                 </span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-auto gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium"
+                      aria-label={`Language: ${language}`}
+                    >
+                      {language}
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuRadioGroup
+                      value={language}
+                      onValueChange={setLanguage}
+                    >
+                      <DropdownMenuRadioItem value="All Languages">
+                        All Languages
+                      </DropdownMenuRadioItem>
+                      {availableLanguages.map((availableLanguage) => (
+                        <DropdownMenuRadioItem
+                          key={availableLanguage}
+                          value={availableLanguage}
+                        >
+                          {availableLanguage}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <button
                   type="button"
-                  onClick={() => setSeverityFilter("all")}
-                  className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "all"
-                      ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
-                      : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
+                  onClick={() => setAcceptingOnly(false)}
+                  className={`px-2.5 py-1 rounded-md border font-medium transition ${!acceptingOnly
+                    ? "bg-white text-slate-600 border-slate-200"
+                    : "bg-slate-900 text-white border-slate-900 hover:bg-slate-50 hover:text-slate-600"
                     }`}
                 >
-                  All Facilities
+                  All Specialists
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSeverityFilter("level1")}
-                  className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "level1"
-                      ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
-                      : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
+                  onClick={() => setAcceptingOnly(true)}
+                  className={`px-2.5 py-1 rounded-md border font-medium transition ${acceptingOnly
+                    ? "bg-white text-slate-600 border-slate-200"
+                    : "bg-slate-900 text-white border-slate-900 hover:bg-slate-50 hover:text-slate-600"
                     }`}
                 >
-                  Level 1 Trauma
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSeverityFilter("pediatric")}
-                  className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "pediatric"
-                      ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
-                      : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
-                    }`}
-                >
-                  Pediatric Units
+                  Accepting New Patients
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-slate-400 font-medium">Sort by:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="bg-slate-950 border border-slate-800 rounded-md py-1 px-2.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                >
-                  <option value="totalTime">Total Time (Fastest Care)</option>
-                  <option value="waitTime">Shortest ER Wait</option>
-                  <option value="driveTime">Shortest Drive</option>
-                </select>
-              </div>
             </div>
           </div>
         </div>
@@ -264,112 +247,60 @@ export default function Page() {
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <User2 className="h-4 w-4 text-indigo-400" />
-              Matching Specialists ({filteredHospitals.length})
+              Matching Specialists ({filteredSpecialists.length})
             </h3>
             <span className="text-xs text-slate-400">Live triage metrics refreshed</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredHospitals.map((hospital, idx) => {
-              const totalMin = hospital.driveTimeMin + hospital.waitTimeMin;
+          {loading && <p className="text-sm text-white-500">Loading specialists...</p>}
+          {error && <p role="alert" className="text-sm text-rose-600">{error}</p>}
+          {!loading && !error && filteredSpecialists.length === 0 && (
+            <p className="text-sm text-slate-500">No specialists found.</p>
+          )}
 
-              return (
+          {!loading && !error && filteredSpecialists.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredSpecialists.map((specialist) => (
                 <div
-                  key={hospital.id}
+                  key={specialist.id}
                   className="bg-slate-900/90 rounded-2xl border border-slate-800 p-5 transition hover:shadow-xl space-y-4 relative"
                 >
                   <div>
-                    <h4 className="font-bold text-white text-base">{hospital.name}</h4>
-                    <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-                      <MapPin className="h-3 w-3 text-slate-500" /> {hospital.address} • {hospital.distanceMiles} miles away
-                    </p>
+                    <h4 className="font-bold text-white text-base">
+                      {specialist.displayName}
+                    </h4>
+                    {specialist.location && (
+                      <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                        <MapPin className="h-3 w-3 text-slate-500" /> {specialist.location}
+                      </p>
+                    )}
                   </div>
 
-                  {/* Metrics Bar */}
-                  <div className="grid grid-cols-3 gap-2 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 text-center">
-                    <div>
-                      <span className="text-[11px] text-slate-400 block flex items-center justify-center gap-1">
-                        <Car className="h-3 w-3 text-blue-400" /> Driving
-                      </span>
-                      <span className="text-sm font-bold text-slate-200">{hospital.driveTimeMin} mins</span>
-                    </div>
-
-                    <div>
-                      <span className="text-[11px] text-slate-400 block flex items-center justify-center gap-1">
-                        <Clock className="h-3 w-3 text-amber-400" /> ER Wait
-                      </span>
+                  <div className="flex flex-wrap gap-1">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60">
+                      {specialist.specialty}
+                    </span>
+                    {specialist.languages.map((specialistLanguage) => (
                       <span
-                        className={`text-sm font-bold ${hospital.waitTimeMin <= 20
-                            ? "text-emerald-400"
-                            : hospital.waitTimeMin <= 40
-                              ? "text-amber-400"
-                              : "text-rose-400"
-                          }`}
+                        key={specialistLanguage}
+                        className="text-[10px] bg-indigo-950/60 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800/50"
                       >
-                        {hospital.waitTimeMin} mins
+                        {specialistLanguage}
                       </span>
-                    </div>
-
-                    <div className="border-l border-slate-800">
-                      <span className="text-[11px] text-slate-400 font-medium block">Total to Care</span>
-                      <span className="text-sm font-extrabold text-white">{totalMin} mins</span>
-                    </div>
+                    ))}
                   </div>
 
-                  {/* Badges / Specialties */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60">
-                        <ShieldCheck className="h-3 w-3 text-emerald-400" /> {hospital.erLevel}
-                      </span>
-                      <span className="text-[11px] text-slate-400">
-                        Available ER Beds: <strong className="text-slate-200">{hospital.availableBeds}</strong>
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1">
-                      {hospital.specialties.map((spec) => (
-                        <span
-                          key={spec}
-                          className="text-[10px] bg-indigo-950/60 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800/50"
-                        >
-                          {spec}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Actions */}
                   <div className="pt-2 flex items-center gap-2 border-t border-slate-800/80">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 text-xs gap-1.5 h-9 bg-slate-950 hover:bg-slate-800 border-slate-800 text-slate-300"
-                      onClick={() => alert(`Calling specialist department: ${hospital.phone}`)}
-                    >
-                      <PhoneCall className="h-3.5 w-3.5 text-slate-400" />
-                      {hospital.phone}
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="flex-1 text-xs gap-1.5 h-9 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold"
-                      onClick={() =>
-                        window.open(
-                          `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
-                            hospital.name + " " + hospital.address
-                          )}`,
-                          "_blank"
-                        )
-                      }
-                    >
-                      <Navigation className="h-3.5 w-3.5" />
-                      Directions
-                    </Button>
+                    <span className={`text-xs font-medium ${specialist.acceptingNewPatients ? "text-emerald-700" : "text-slate-500"}`}>
+                      {specialist.acceptingNewPatients
+                        ? "Accepting new patients"
+                        : "Not accepting new patients"}
+                    </span>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </main>
 
