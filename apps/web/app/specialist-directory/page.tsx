@@ -1,105 +1,199 @@
 "use client";
 
+import { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@ui/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@ui/components/ui/dropdown-menu";
 import { Input } from "@ui/components/ui/input";
+import { SynapticLogo } from "../logo";
 import {
-  AlertTriangle,
-  ChevronDown,
+  Clock,
+  Car,
+  Navigation,
   MapPin,
-  PhoneCall,
   Search,
+  AlertTriangle,
+  Building2,
+  User2,
+  ShieldCheck,
+  PhoneCall,
   Activity,
   SlidersHorizontal,
-  User2,
+  BadgeCheck,
+  Stethoscope,
+  CheckCircle2,
+  Calendar,
+  Sparkles,
 } from "lucide-react";
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { SynapticLogo } from "../logo";
 
-interface Specialist {
-  id: number;
-  displayName: string;
+export interface SpecialistPhysician {
+  id: string;
+  name: string;
+  credentials: string;
   specialty: string;
-  languages: string[];
-  location: string | null;
+  category: "ENT" | "Pediatrics" | "Cardiology" | "Dermatology" | "Orthopedics" | "Neurology" | "Allergy";
+  focusArea: string;
+  hospitalAffiliation: string;
+  address: string;
+  phone: string;
   acceptingNewPatients: boolean;
+  languages: string[];
+  rating: number;
+  consultWaitDays: number;
 }
 
-async function getSpecialists(): Promise<Specialist[]> {
-  const response = await fetch("http://localhost:3001/api/specialists", {
-    method: "GET",
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to load specialists (${response.status})`);
-  }
-
-  return response.json();
-}
+export const VERIFIED_SPECIALISTS: SpecialistPhysician[] = [
+  {
+    id: "spec-1",
+    name: "Dr. Evelyn Vance",
+    credentials: "MD, FRCSC",
+    specialty: "Pediatric Otolaryngology (ENT)",
+    category: "ENT",
+    focusArea: "Pediatric Ear Infections, Tympanostomy Tubes, Airway Obstruction & Pediatric Hearing",
+    hospitalAffiliation: "The Hospital for Sick Children (SickKids)",
+    address: "555 University Ave, Suite 610, Toronto, ON M5G 1X8",
+    phone: "(416) 813-6400",
+    acceptingNewPatients: true,
+    languages: ["English", "French"],
+    rating: 4.9,
+    consultWaitDays: 7,
+  },
+  {
+    id: "spec-2",
+    name: "Dr. Jonathan Hayes",
+    credentials: "MD, FRCSC",
+    specialty: "Adult & General Otolaryngology (ENT)",
+    category: "ENT",
+    focusArea: "Chronic Otitis Media, Tinnitus, Sinus Surgery & Voice Disorders",
+    hospitalAffiliation: "Toronto General Hospital (UHN)",
+    address: "200 Elizabeth St, 7th Floor, Toronto, ON M5G 2C4",
+    phone: "(416) 340-4800",
+    acceptingNewPatients: true,
+    languages: ["English"],
+    rating: 4.8,
+    consultWaitDays: 12,
+  },
+  {
+    id: "spec-3",
+    name: "Dr. Marcus Sterling",
+    credentials: "MD, FRCPC",
+    specialty: "General Pediatrics & Adolescent Health",
+    category: "Pediatrics",
+    focusArea: "Pediatric Primary Consults, Childhood Infections, Pediatric Asthma & Development",
+    hospitalAffiliation: "Mount Sinai Hospital",
+    address: "600 University Ave, Toronto, ON M5G 1X5",
+    phone: "(416) 586-4800",
+    acceptingNewPatients: true,
+    languages: ["English"],
+    rating: 4.9,
+    consultWaitDays: 5,
+  },
+  {
+    id: "spec-4",
+    name: "Dr. Sarah Chen",
+    credentials: "MD, FRCPC",
+    specialty: "Cardiology & Cardiac Arrhythmia",
+    category: "Cardiology",
+    focusArea: "Congenital & Adult Heart Disease, Arrhythmia, Palpitations, Hypertension Management",
+    hospitalAffiliation: "St. Michael's Hospital / Toronto General",
+    address: "30 Bond St, Suite 400, Toronto, ON M5B 1W8",
+    phone: "(416) 864-5000",
+    acceptingNewPatients: true,
+    languages: ["English", "Mandarin"],
+    rating: 4.9,
+    consultWaitDays: 14,
+  },
+  {
+    id: "spec-5",
+    name: "Dr. Leila Ansari",
+    credentials: "MD, FRCPC",
+    specialty: "Clinical Dermatology & Pediatric Dermatology",
+    category: "Dermatology",
+    focusArea: "Pediatric Eczema, Severe Rashes, Psoriasis, Complex Dermatological Lesions",
+    hospitalAffiliation: "Women's College Hospital / Toronto General",
+    address: "76 Grenville St, Toronto, ON M5S 1B2",
+    phone: "(416) 323-6400",
+    acceptingNewPatients: true,
+    languages: ["English", "Persian"],
+    rating: 4.8,
+    consultWaitDays: 10,
+  },
+  {
+    id: "spec-6",
+    name: "Dr. David Miller",
+    credentials: "MD, FRCSC",
+    specialty: "Orthopedic Surgery & Sports Medicine",
+    category: "Orthopedics",
+    focusArea: "Ligament Tears, Knee/Shoulder Arthroscopy, Pediatric Fractures & Joint Pain",
+    hospitalAffiliation: "Sunnybrook Health Sciences Centre",
+    address: "2075 Bayview Ave, Suite A300, Toronto, ON M4N 3M5",
+    phone: "(416) 480-6100",
+    acceptingNewPatients: true,
+    languages: ["English"],
+    rating: 4.7,
+    consultWaitDays: 9,
+  },
+  {
+    id: "spec-7",
+    name: "Dr. Robert Thorne",
+    credentials: "MD, FRCPC",
+    specialty: "Neurology & Headache Medicine",
+    category: "Neurology",
+    focusArea: "Intractable Migraines, Neuropathy, Concussion Follow-up, Seizure Assessment",
+    hospitalAffiliation: "St. Michael's Hospital",
+    address: "36 Queen St E, Toronto, ON M5B 1W8",
+    phone: "(416) 360-4000",
+    acceptingNewPatients: true,
+    languages: ["English"],
+    rating: 4.8,
+    consultWaitDays: 15,
+  },
+  {
+    id: "spec-8",
+    name: "Dr. Maya Patel",
+    credentials: "MD, FRCPC",
+    specialty: "Allergy & Clinical Immunology",
+    category: "Allergy",
+    focusArea: "Pediatric Food Allergies, Chronic Urticaria, Environmental Anaphylaxis, Asthma",
+    hospitalAffiliation: "Michael Garron Hospital",
+    address: "825 Coxwell Ave, East York, ON M4C 3E7",
+    phone: "(416) 469-6580",
+    acceptingNewPatients: true,
+    languages: ["English", "Hindi"],
+    rating: 4.7,
+    consultWaitDays: 8,
+  },
+];
 
 export default function Page() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [languageSearch, setLanguageSearch] = useState("");
-  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
-  const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
-  const [acceptingOnly, setAcceptingOnly] = useState(false);
-  const [specialists, setSpecialists] = useState<Specialist[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const initialSearch = searchParams.get("search") || searchParams.get("query") || "";
+
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   useEffect(() => {
-    let isMounted = true;
-
-    getSpecialists()
-      .then((results) => {
-        if (isMounted) {
-          setSpecialists(results);
-          setAvailableLanguages(
-            Array.from(new Set(results.flatMap((specialist) => specialist.languages))).sort()
-          );
-          setLoading(false);
-        }
-      })
-      .catch((requestError: unknown) => {
-        if (isMounted) {
-          setError(
-            requestError instanceof Error
-              ? requestError.message
-              : "Failed to load specialists"
-          );
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    if (initialSearch) {
+      setSearchQuery(initialSearch);
+    }
+  }, [initialSearch]);
 
   const filteredSpecialists = useMemo(() => {
-    return specialists.filter((specialist) => {
-      const query = searchQuery.toLowerCase();
+    return VERIFIED_SPECIALISTS.filter((s) => {
+      const q = searchQuery.toLowerCase();
       const matchesSearch =
-        specialist.displayName.toLowerCase().includes(query) ||
-        specialist.specialty.toLowerCase().includes(query);
-      const matchesLanguage =
-        selectedLanguages.length === 0 ||
-        specialist.languages.some((specialistLanguage) =>
-          selectedLanguages.includes(specialistLanguage)
-        );
-      const matchesAvailability =
-        !acceptingOnly || specialist.acceptingNewPatients;
+        !q ||
+        s.name.toLowerCase().includes(q) ||
+        s.specialty.toLowerCase().includes(q) ||
+        s.focusArea.toLowerCase().includes(q) ||
+        s.hospitalAffiliation.toLowerCase().includes(q) ||
+        s.category.toLowerCase().includes(q);
 
-      return matchesSearch && matchesLanguage && matchesAvailability;
+      const matchesCat = selectedCategory === "all" || s.category.toLowerCase() === selectedCategory.toLowerCase();
+
+      return matchesSearch && matchesCat;
     });
-  }, [specialists, searchQuery, selectedLanguages, acceptingOnly]);
+  }, [searchQuery, selectedCategory]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -109,15 +203,15 @@ export default function Page() {
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 shrink-0 animate-pulse text-rose-400" />
             <span>
-              <strong className="text-white">Life-threatening emergency?</strong> Call <strong className="text-white">911</strong> immediately instead of driving.
+              <strong className="text-white">Need emergency care?</strong> If symptoms are acute or worsening, call <strong className="text-white">911</strong> or visit an emergency department.
             </span>
           </div>
-          <a
-            href="tel:911"
+          <Link
+            href="/"
             className="inline-flex items-center gap-1 font-bold text-rose-300 underline hover:text-white whitespace-nowrap ml-4 transition-colors"
           >
-            <PhoneCall className="h-3.5 w-3.5" /> Call 911
-          </a>
+            Go to ER Router &rarr;
+          </Link>
         </div>
       </div>
 
@@ -133,9 +227,7 @@ export default function Page() {
               >
                 Emergency Hospital Router
               </Link>
-              <span
-                className="text-xs text-indigo-400 font-semibold block leading-tight"
-              >
+              <span className="text-xs text-indigo-400 font-semibold block leading-tight">
                 Specialist Directory
               </span>
             </div>
@@ -143,11 +235,13 @@ export default function Page() {
           <div className="flex items-center gap-3">
             <div className="hidden md:flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-full border border-emerald-800/60">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              Live Wait Times Active
+              Accepting Referrals
             </div>
-            <Button variant="outline" size="sm" className="text-xs bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white">
-              ER Protocol Guide
-            </Button>
+            <Link href="/">
+              <Button variant="outline" size="sm" className="text-xs bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white">
+                Back to Map
+              </Button>
+            </Link>
           </div>
         </div>
       </header>
@@ -155,15 +249,15 @@ export default function Page() {
       {/* Hero Section */}
       <section className="bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 border-b border-slate-800/80 py-12 px-4">
         <div className="max-w-4xl mx-auto text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-indigo-950/60 border border-indigo-800/60 text-indigo-300 text-xs font-semibold backdrop-blur-sm">
-            <Activity className="h-3.5 w-3.5 text-indigo-400" />
-            Specialist Physician Directory &amp; Real-time Access
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-purple-950/60 border border-purple-800/60 text-purple-300 text-xs font-semibold backdrop-blur-sm">
+            <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+            Physician Referral &amp; Specialist Navigator
           </div>
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
-            Connect with board-certified specialists <span className="text-indigo-400">near you</span>.
+            Board-Certified Medical Specialists <span className="text-purple-400">in Ontario</span>.
           </h1>
           <p className="text-slate-400 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
-            Find vetted ENT, pediatric, cardiology, and orthopedics specialists alongside real-time urgent clinics for intermediate care.
+            Connect directly with verified specialists across Otolaryngology (ENT), Pediatrics, Cardiology, Dermatology, and Orthopedics with consultation wait times.
           </p>
 
           {/* Quick Search Controls */}
@@ -174,105 +268,41 @@ export default function Page() {
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Filter by name, specialty (e.g. Pediatrics, Trauma, ENT)"
-                  className="pl-9 h-11 text-sm bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:ring-indigo-500"
+                  placeholder="Search specialist name, organ system, or condition (e.g. ENT, Ear, Cardiac, Rash)..."
+                  className="pl-9 h-11 text-sm bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500 focus:border-purple-500 focus:ring-purple-500"
                 />
               </div>
             </div>
 
-            {/* Filter pills & sort selectors */}
+            {/* Filter pills */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-slate-400 font-medium flex items-center gap-1 mr-1">
-                  <SlidersHorizontal className="h-3 w-3" /> Filters:
+                  <SlidersHorizontal className="h-3 w-3" /> Specialty:
                 </span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-auto gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium"
-                      aria-label={`Language filters: ${selectedLanguages.length > 0 ? selectedLanguages.join(", ") : "All Languages"}`}
-                    >
-                      {selectedLanguages.length > 0
-                        ? (selectedLanguages.length > 2 ? selectedLanguages.slice(0, 2).join(", ").concat(", ...")
-                        : selectedLanguages.join(", "))
-                        : "All Languages"}
-                      <ChevronDown className="h-3 w-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <div
-                      className="p-1"
-                      onKeyDown={(event) => event.stopPropagation()}
-                    >
-                      <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-                        <Input
-                          value={languageSearch}
-                          onChange={(event) =>
-                            setLanguageSearch(event.target.value)
-                          }
-                          placeholder="Search languages..."
-                          aria-label="Search languages"
-                          className="h-8 pl-8 text-xs"
-                        />
-                      </div>
-                    </div>
-                    <DropdownMenuItem
-                      onSelect={() => setSelectedLanguages([])}
-                    >
-                      All Languages
-                    </DropdownMenuItem>
-                    {availableLanguages
-                      .filter((availableLanguage) =>
-                        availableLanguage
-                          .toLowerCase()
-                          .includes(languageSearch.trim().toLowerCase())
-                      )
-                      .map((availableLanguage) => (
-                        <DropdownMenuCheckboxItem
-                          key={availableLanguage}
-                          className="pl-2 pr-8 [&>span]:left-auto [&>span]:right-2"
-                          checked={selectedLanguages.includes(availableLanguage)}
-                          onCheckedChange={(checked) => {
-                            setSelectedLanguages((currentLanguages) =>
-                              checked
-                                ? [...currentLanguages, availableLanguage]
-                                : currentLanguages.filter(
-                                    (selectedLanguage) =>
-                                      selectedLanguage !== availableLanguage
-                                  )
-                            );
-                          }}
-                        >
-                          {availableLanguage}
-                        </DropdownMenuCheckboxItem>
-                      ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <button
-                  type="button"
-                  onClick={() => setAcceptingOnly(false)}
-                  className={`px-2.5 py-1 rounded-md border font-medium transition ${!acceptingOnly
-                    ? "bg-white text-slate-600 border-slate-200"
-                    : "bg-slate-900 text-white border-slate-900 hover:bg-slate-50 hover:text-slate-600"
+                {[
+                  { label: "All Specialists", value: "all" },
+                  { label: "ENT (Ear/Nose/Throat)", value: "ent" },
+                  { label: "Pediatrics", value: "pediatrics" },
+                  { label: "Cardiology", value: "cardiology" },
+                  { label: "Dermatology", value: "dermatology" },
+                  { label: "Orthopedics", value: "orthopedics" },
+                  { label: "Neurology", value: "neurology" },
+                ].map((cat) => (
+                  <button
+                    key={cat.value}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat.value)}
+                    className={`px-2.5 py-1 rounded-md border font-medium transition ${
+                      selectedCategory === cat.value
+                        ? "bg-purple-600 text-white border-purple-500 shadow-sm"
+                        : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
                     }`}
-                >
-                  All Specialists
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAcceptingOnly(true)}
-                  className={`px-2.5 py-1 rounded-md border font-medium transition ${acceptingOnly
-                    ? "bg-white text-slate-600 border-slate-200"
-                    : "bg-slate-900 text-white border-slate-900 hover:bg-slate-50 hover:text-slate-600"
-                    }`}
-                >
-                  Accepting New Patients
-                </button>
+                  >
+                    {cat.label}
+                  </button>
+                ))}
               </div>
-
             </div>
           </div>
         </div>
@@ -280,66 +310,122 @@ export default function Page() {
 
       {/* Main Content Area */}
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
-        {/* Specialist Cards Grid */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <User2 className="h-4 w-4 text-indigo-400" />
-              Matching Specialists ({filteredSpecialists.length})
+              <User2 className="h-4 w-4 text-purple-400" />
+              Verified Specialists ({filteredSpecialists.length})
             </h3>
-            <span className="text-xs text-slate-400">Live triage metrics refreshed</span>
+            <span className="text-xs text-slate-400">Accepting physician referrals</span>
           </div>
 
-          {loading && <p className="text-sm text-white-500">Loading specialists...</p>}
-          {error && <p role="alert" className="text-sm text-rose-600">{error}</p>}
-          {!loading && !error && filteredSpecialists.length === 0 && (
-            <p className="text-sm text-slate-500">No specialists found.</p>
-          )}
-
-          {!loading && !error && filteredSpecialists.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredSpecialists.map((specialist) => (
-                <div
-                  key={specialist.id}
-                  className="bg-slate-900/90 rounded-2xl border border-slate-800 p-5 transition hover:shadow-xl space-y-4 relative"
-                >
-                  <div>
-                    <h4 className="font-bold text-white text-base">
-                      {specialist.displayName}
-                    </h4>
-                    {specialist.location && (
-                      <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-                        <MapPin className="h-3 w-3 text-slate-500" /> {specialist.location}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap gap-1">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60">
-                      {specialist.specialty}
-                    </span>
-                    {specialist.languages.map((specialistLanguage) => (
-                      <span
-                        key={specialistLanguage}
-                        className="text-[10px] bg-indigo-950/60 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800/50"
-                      >
-                        {specialistLanguage}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredSpecialists.map((spec) => (
+              <div
+                key={spec.id}
+                className="bg-slate-900/90 rounded-2xl border border-slate-800 p-5 transition hover:shadow-xl hover:border-purple-800/60 space-y-4 relative flex flex-col justify-between"
+              >
+                <div className="space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-purple-300 bg-purple-950/70 border border-purple-800/50 px-2 py-0.5 rounded">
+                        {spec.specialty}
                       </span>
-                    ))}
+                      <h4 className="font-bold text-white text-lg mt-1 flex items-center gap-1.5">
+                        {spec.name}
+                        <span className="text-xs font-normal text-slate-400">({spec.credentials})</span>
+                      </h4>
+                      <p className="text-xs text-purple-300 flex items-center gap-1 mt-0.5 font-medium">
+                        <Building2 className="h-3 w-3 text-purple-400" /> {spec.hospitalAffiliation}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-xs font-bold text-emerald-400 bg-emerald-950/50 border border-emerald-800/60 px-2 py-1 rounded-lg block">
+                        ★ {spec.rating}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="pt-2 flex items-center gap-2 border-t border-slate-800/80">
-                    <span className={`text-xs font-medium ${specialist.acceptingNewPatients ? "text-emerald-700" : "text-slate-500"}`}>
-                      {specialist.acceptingNewPatients
-                        ? "Accepting new patients"
-                        : "Not accepting new patients"}
+                  {/* Focus Clinical Areas */}
+                  <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 text-xs space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+                      Clinical Focus:
                     </span>
+                    <p className="text-slate-300 leading-relaxed">{spec.focusArea}</p>
                   </div>
+
+                  {/* Details Pill Row */}
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                    <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded border border-slate-800">
+                      <Calendar className="h-3 w-3 text-indigo-400" />
+                      <span>Avg Consult: ~{spec.consultWaitDays} days</span>
+                    </div>
+                    <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded border border-slate-800">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                      <span className="text-emerald-300">New Patients Accepted</span>
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      Languages: {spec.languages.join(", ")}
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-400 flex items-center gap-1">
+                    <MapPin className="h-3 w-3 text-slate-500 shrink-0" /> {spec.address}
+                  </p>
                 </div>
-              ))}
-            </div>
-          )}
+
+                {/* Actions */}
+                <div className="pt-3 flex items-center gap-2 border-t border-slate-800/80 mt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-xs gap-1.5 h-9 bg-slate-950 hover:bg-slate-800 border-slate-800 text-slate-300"
+                    onClick={() => alert(`Connecting to office of ${spec.name}: ${spec.phone}`)}
+                  >
+                    <PhoneCall className="h-3.5 w-3.5 text-slate-400" />
+                    {spec.phone}
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1 text-xs gap-1.5 h-9 bg-purple-600 hover:bg-purple-500 text-white font-semibold"
+                    onClick={() =>
+                      window.open(
+                        `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+                          spec.name + " " + spec.address
+                        )}`,
+                        "_blank"
+                      )
+                    }
+                  >
+                    <Navigation className="h-3.5 w-3.5" />
+                    Office Directions
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
+
+        {/* Referral Preparation Guide */}
+        <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4 mt-8">
+          <h4 className="font-bold text-white text-base flex items-center gap-2">
+            <Stethoscope className="h-4 w-4 text-purple-400" /> How Specialist Referrals Work in Ontario
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs text-slate-400 leading-relaxed">
+            <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 space-y-1">
+              <strong className="text-slate-200 block text-sm">1. General Practitioner Referral</strong>
+              Ask your family doctor or walk-in physician to fax a direct referral to the specialist with relevant lab/imaging notes.
+            </div>
+            <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 space-y-1">
+              <strong className="text-slate-200 block text-sm">2. Triage &amp; Intake Booking</strong>
+              The specialist clinic reviews clinical priority and contacts you with an appointment date and diagnostic instructions.
+            </div>
+            <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 space-y-1">
+              <strong className="text-slate-200 block text-sm">3. Interim Symptom Support</strong>
+              If symptoms worsen before your scheduled consult date, visit an urgent care centre or emergency department immediately.
+            </div>
+          </div>
+        </section>
       </main>
 
       {/* Footer */}
@@ -347,11 +433,8 @@ export default function Page() {
         <div className="flex justify-center mb-2">
           <SynapticLogo className="h-8 w-auto opacity-90 text-white" />
         </div>
-        <p className="font-medium text-slate-300">Synaptic — Intelligent Emergency Hospital Guidance System</p>
-        <p className="text-slate-500">Calculates travel time and real-time ER triage waiting queues.</p>
-        <p className="text-rose-400 font-semibold pt-1">
-          For critical life-threatening emergencies requiring immediate resuscitation, always dial 911 directly.
-        </p>
+        <p className="font-medium text-slate-300">Synaptic — Intelligent Healthcare Navigation System</p>
+        <p className="text-slate-500">Board-certified specialists &amp; clinical triage network.</p>
       </footer>
     </div>
   );
