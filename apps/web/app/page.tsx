@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@ui/components/ui/button";
 import { Input } from "@ui/components/ui/input";
 import { SynapticLogo } from "./logo";
+import InteractiveMap, { FacilityMarker } from "./map";
 import {
   Clock,
   Car,
@@ -19,6 +20,9 @@ import {
   SlidersHorizontal,
   BadgeCheck,
   Stethoscope,
+  Compass,
+  ExternalLink,
+  Layers,
 } from "lucide-react";
 
 interface HospitalItem {
@@ -33,68 +37,115 @@ interface HospitalItem {
   rating: number;
   availableBeds: number;
   specialties: string[];
+  lat: number;
+  lng: number;
 }
 
 const SAMPLE_HOSPITALS: HospitalItem[] = [
   {
     id: "1",
-    name: "Memorial Medical Center",
-    address: "742 Evergreen Terrace, Metro Area",
-    phone: "(555) 234-5678",
-    distanceMiles: 4.2,
-    driveTimeMin: 12,
+    name: "Toronto General Hospital",
+    address: "200 Elizabeth St, Toronto, ON M5G 2C4",
+    phone: "(416) 340-4800",
+    distanceMiles: 1.2,
+    driveTimeMin: 8,
     waitTimeMin: 18,
     erLevel: "Level 1 Trauma",
     rating: 4.8,
     availableBeds: 14,
-    specialties: ["Cardiac Care", "Pediatrics", "Trauma", "Stroke Unit"],
+    specialties: ["Cardiac Care", "Transplant Unit", "Stroke Center", "Trauma"],
+    lat: 43.6591,
+    lng: -79.3882,
   },
   {
     id: "2",
-    name: "Saint Jude Community Hospital",
-    address: "1204 Pine Valley Rd, Downtown",
-    phone: "(555) 876-5432",
-    distanceMiles: 2.1,
-    driveTimeMin: 8,
-    waitTimeMin: 45,
+    name: "Mount Sinai Hospital",
+    address: "600 University Ave, Toronto, ON M5G 1X5",
+    phone: "(416) 586-4800",
+    distanceMiles: 1.1,
+    driveTimeMin: 7,
+    waitTimeMin: 42,
     erLevel: "Level 2 Trauma",
-    rating: 4.4,
+    rating: 4.6,
     availableBeds: 6,
-    specialties: ["General ER", "Orthopedics", "Urgent Surgery"],
+    specialties: ["General ER", "Women & Infants", "Urgent Surgery"],
+    lat: 43.6575,
+    lng: -79.3905,
   },
   {
     id: "3",
-    name: "Westside Emergency & Trauma Pavilion",
-    address: "880 Ocean Avenue, West District",
-    phone: "(555) 345-9871",
-    distanceMiles: 7.8,
-    driveTimeMin: 16,
-    waitTimeMin: 12,
+    name: "St. Michael's Hospital",
+    address: "36 Queen St E, Toronto, ON M5B 1W8",
+    phone: "(416) 360-4000",
+    distanceMiles: 0.8,
+    driveTimeMin: 5,
+    waitTimeMin: 14,
     erLevel: "Level 1 Trauma",
     rating: 4.9,
     availableBeds: 21,
-    specialties: ["Comprehensive Stroke", "Burn Center", "Cardiology"],
+    specialties: ["Level 1 Adult Trauma", "Neurosurgery", "Cardiac Care"],
+    lat: 43.6534,
+    lng: -79.3772,
   },
   {
     id: "4",
-    name: "Northview Urgent Health Center",
-    address: "3100 Highland Park Blvd, North Shore",
-    phone: "(555) 654-2109",
-    distanceMiles: 5.5,
-    driveTimeMin: 14,
-    waitTimeMin: 35,
+    name: "SickKids (Hospital for Sick Children)",
+    address: "555 University Ave, Toronto, ON M5G 1X8",
+    phone: "(416) 813-1500",
+    distanceMiles: 1.3,
+    driveTimeMin: 9,
+    waitTimeMin: 22,
+    erLevel: "Level 1 Trauma",
+    rating: 4.9,
+    availableBeds: 18,
+    specialties: ["Pediatrics", "Pediatric Trauma", "Child Emergency"],
+    lat: 43.6578,
+    lng: -79.3867,
+  },
+  {
+    id: "5",
+    name: "Sunnybrook Health Sciences Centre",
+    address: "2075 Bayview Ave, Toronto, ON M4N 3M5",
+    phone: "(416) 480-6100",
+    distanceMiles: 5.4,
+    driveTimeMin: 18,
+    waitTimeMin: 16,
+    erLevel: "Level 1 Trauma",
+    rating: 4.7,
+    availableBeds: 25,
+    specialties: ["Comprehensive Trauma", "Burn Centre", "Brain Sciences"],
+    lat: 43.7250,
+    lng: -79.3764,
+  },
+  {
+    id: "6",
+    name: "Michael Garron Hospital",
+    address: "825 Coxwell Ave, East York, ON M4C 3E7",
+    phone: "(416) 469-6580",
+    distanceMiles: 4.5,
+    driveTimeMin: 15,
+    waitTimeMin: 28,
     erLevel: "Community Emergency",
-    rating: 4.2,
-    availableBeds: 8,
-    specialties: ["Rapid Diagnostics", "Pediatrics", "Minor Fractures"],
+    rating: 4.3,
+    availableBeds: 9,
+    specialties: ["Community Care", "Rapid Diagnostics", "Orthopedics"],
+    lat: 43.6908,
+    lng: -79.3242,
   },
 ];
 
 export default function Page() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [userLocation, setUserLocation] = useState("Current Location (detected)");
+  const [userLocation, setUserLocation] = useState("Toronto, ON (detected)");
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number; label: string }>({
+    lat: 43.6532,
+    lng: -79.3832,
+    label: "Current Location (Toronto City Hall)",
+  });
+  const [selectedHospitalId, setSelectedHospitalId] = useState<string>("3");
   const [sortBy, setSortBy] = useState<"totalTime" | "waitTime" | "driveTime">("totalTime");
   const [severityFilter, setSeverityFilter] = useState<"all" | "level1" | "pediatric">("all");
+  const [mapMode, setMapMode] = useState<"interactive" | "streamlit">("interactive");
 
   const filteredHospitals = useMemo(() => {
     return SAMPLE_HOSPITALS.filter((h) => {
@@ -221,8 +272,8 @@ export default function Page() {
                   type="button"
                   onClick={() => setSeverityFilter("all")}
                   className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "all"
-                      ? "bg-slate-900 text-white border-slate-900"
-                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                    ? "bg-slate-900 text-white border-slate-900"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                     }`}
                 >
                   All Facilities
@@ -231,8 +282,8 @@ export default function Page() {
                   type="button"
                   onClick={() => setSeverityFilter("level1")}
                   className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "level1"
-                      ? "bg-slate-900 text-white border-slate-900"
-                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                    ? "bg-slate-900 text-white border-slate-900"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                     }`}
                 >
                   Level 1 Trauma
@@ -241,8 +292,8 @@ export default function Page() {
                   type="button"
                   onClick={() => setSeverityFilter("pediatric")}
                   className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "pediatric"
-                      ? "bg-slate-900 text-white border-slate-900"
-                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                    ? "bg-slate-900 text-white border-slate-900"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                     }`}
                 >
                   Pediatric Units
@@ -325,6 +376,107 @@ export default function Page() {
           </div>
         )}
 
+        {/* Interactive Accessibility Map Container */}
+        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/70">
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-sm">
+                <Compass className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  Interactive Healthcare Travel-Time Map
+                  <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                    Live OpenStreetMap
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Real-time hospital facility mapping with total travel-time bands to emergency care
+                </p>
+              </div>
+            </div>
+
+            {/* Map Mode Toggle & External Link */}
+            <div className="flex items-center gap-2">
+              <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-xs shadow-xs">
+                <button
+                  type="button"
+                  onClick={() => setMapMode("interactive")}
+                  className={`px-3 py-1 font-medium rounded-md transition ${mapMode === "interactive"
+                      ? "bg-slate-900 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                    }`}
+                >
+                  Native Interactive Map
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMapMode("streamlit")}
+                  className={`px-3 py-1 font-medium rounded-md transition ${mapMode === "streamlit"
+                      ? "bg-slate-900 text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                    }`}
+                >
+                  Streamlit Routing Hub
+                </button>
+              </div>
+
+              <a
+                href="http://localhost:8501"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 shadow-xs transition"
+              >
+                <ExternalLink className="h-3.5 w-3.5 text-slate-500" /> Full Screen
+              </a>
+            </div>
+          </div>
+
+          <div className="relative w-full bg-slate-100">
+            {mapMode === "interactive" ? (
+              <InteractiveMap
+                userLocation={userCoords}
+                facilities={filteredHospitals.map((h) => ({
+                  id: h.id,
+                  name: h.name,
+                  type: h.erLevel,
+                  address: h.address,
+                  lat: h.lat,
+                  lng: h.lng,
+                  driveTimeMin: h.driveTimeMin,
+                  waitTimeMin: h.waitTimeMin,
+                  totalTimeMin: h.driveTimeMin + h.waitTimeMin,
+                }))}
+                selectedFacilityId={selectedHospitalId}
+                onSelectFacility={(id) => setSelectedHospitalId(id)}
+                height="560px"
+              />
+            ) : (
+              <div className="h-[620px] w-full">
+                <iframe
+                  src="http://localhost:8501/?embedded=true"
+                  title="Synaptic Healthcare Travel-Time Accessibility Map"
+                  className="w-full h-full border-0"
+                  loading="lazy"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="p-3.5 bg-slate-50/50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1 font-medium text-slate-700">
+                <Layers className="h-3.5 w-3.5 text-slate-400" /> Time to Care Bands:
+              </span>
+              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[#16803C]"></span> &le; 20m</span>
+              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[#2563EB]"></span> 21–35m</span>
+              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[#D97706]"></span> 36–50m</span>
+              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[#DC2626]"></span> &gt; 50m</span>
+            </div>
+            <span>Click any marker to view triage metrics &amp; direct navigation</span>
+          </div>
+        </section>
+
         {/* Hospital Cards Grid */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -374,10 +526,10 @@ export default function Page() {
                       </span>
                       <span
                         className={`text-sm font-bold ${hospital.waitTimeMin <= 20
-                            ? "text-emerald-600"
-                            : hospital.waitTimeMin <= 40
-                              ? "text-amber-600"
-                              : "text-rose-600"
+                          ? "text-emerald-600"
+                          : hospital.waitTimeMin <= 40
+                            ? "text-amber-600"
+                            : "text-rose-600"
                           }`}
                       >
                         {hospital.waitTimeMin} mins
