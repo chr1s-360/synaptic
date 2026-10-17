@@ -13,6 +13,7 @@ import {
   geocodeCanadianAddress,
   fetchValhallaMatrix,
 } from "./routing-engine";
+import AINavigator from "./ai-navigator";
 import {
   Clock,
   Car,
@@ -378,8 +379,8 @@ export default function Page() {
                       runRoutingCalculation(originCoords, mode, radiusKm);
                     }}
                     className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg border font-medium transition ${activeMode === mode
-                        ? "bg-slate-900 text-white border-slate-900 shadow-xs"
-                        : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                      ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                      : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
                       }`}
                   >
                     {mode === "Driving" && <Car className="h-3.5 w-3.5" />}
@@ -459,8 +460,8 @@ export default function Page() {
                     type="button"
                     onClick={() => setFacilityTypeFilter(filter)}
                     className={`px-2.5 py-1 rounded-md border font-medium transition ${facilityTypeFilter === filter
-                        ? "bg-slate-900 text-white border-slate-900"
-                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      ? "bg-slate-900 text-white border-slate-900"
+                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                       }`}
                   >
                     {filter === "All" && "All Facilities"}
@@ -581,10 +582,10 @@ export default function Page() {
                   key={hospital.id}
                   onClick={() => setSelectedFacilityId(hospital.id)}
                   className={`bg-white rounded-xl border p-5 transition cursor-pointer hover:shadow-md space-y-4 relative ${isSelected
-                      ? "border-blue-500 ring-2 ring-blue-500/20"
-                      : isBest
-                        ? "border-emerald-500/50 ring-1 ring-emerald-500/20"
-                        : "border-slate-200"
+                    ? "border-blue-500 ring-2 ring-blue-500/20"
+                    : isBest
+                      ? "border-emerald-500/50 ring-1 ring-emerald-500/20"
+                      : "border-slate-200"
                     }`}
                 >
                   {isBest && (
@@ -619,10 +620,10 @@ export default function Page() {
                       </span>
                       <span
                         className={`text-sm font-bold ${hospital.waitTimeMin <= 20
-                            ? "text-emerald-600"
-                            : hospital.waitTimeMin <= 40
-                              ? "text-amber-600"
-                              : "text-rose-600"
+                          ? "text-emerald-600"
+                          : hospital.waitTimeMin <= 40
+                            ? "text-amber-600"
+                            : "text-rose-600"
                           }`}
                       >
                         {hospital.waitTimeMin}m
@@ -708,6 +709,8 @@ export default function Page() {
           </div>
         </section>
       </main>
+
+      <AINavigator />
 
       <footer className="border-t bg-white py-8 mt-12 text-center text-xs text-slate-500 space-y-2">
         <div className="flex justify-center mb-2">

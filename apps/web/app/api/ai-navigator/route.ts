@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export interface Facility {
+interface Facility {
     id: string;
     name: string;
     address: string;
@@ -17,7 +17,7 @@ export interface Facility {
     lng: number;
 }
 
-export const FACILITIES: Facility[] = [
+const FACILITIES: Facility[] = [
     {
         id: "1",
         name: "Toronto General Hospital",
