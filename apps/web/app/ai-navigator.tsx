@@ -263,8 +263,8 @@ export default function AiHealthcareNavigator() {
                             >
                                 <div
                                     className={`max-w-[92%] rounded-2xl px-4 py-3 text-xs sm:text-sm leading-relaxed shadow-sm ${m.sender === "user"
-                                            ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-br-none"
-                                            : "bg-slate-900/95 text-slate-200 border border-slate-800/90 rounded-bl-none"
+                                        ? "bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-br-none"
+                                        : "bg-slate-900/95 text-slate-200 border border-slate-800/90 rounded-bl-none"
                                         }`}
                                 >
                                     <div className="whitespace-pre-line leading-relaxed">{m.text}</div>
@@ -367,7 +367,7 @@ export default function AiHealthcareNavigator() {
 
                                                     {/* Rationale & Action */}
                                                     <p className="text-[11px] text-slate-300 bg-slate-950/60 p-2 rounded border border-slate-800/70 italic">
-                                                        "{stripAsterisks(m.plan.clinicalRationale)}"
+                                                        &ldquo;{stripAsterisks(m.plan.clinicalRationale)}&rdquo;
                                                     </p>
 
                                                     <div className="flex items-center gap-2 pt-1">
