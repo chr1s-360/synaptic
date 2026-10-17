@@ -47,7 +47,8 @@ model Specialist {
   displayName   String
   specialty     String
   language      String
-  location      String?
+  location      String
+  phoneNumber   String
   acceptingNewPatients Boolean @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

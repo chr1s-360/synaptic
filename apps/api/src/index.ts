@@ -123,7 +123,6 @@ app.get("/api/inbound", async (c) => {
   return c.json(tickets);
 });
 
-
 app.post("/api/specialists", async (c) => {
   const body = await c.req.json();
 
@@ -134,13 +133,23 @@ app.post("/api/specialists", async (c) => {
   const language =
     typeof body.language === "string" ? body.language.trim() : "";
   const location =
-    typeof body.location === "string" ? body.location.trim() : undefined;
-  const acceptingNewPatients =
-    body.acceptingNewPatients ?? true;
+    typeof body.location === "string" ? body.location.trim() : "";
+  const phoneNumber =
+    typeof body.phoneNumber === "string" ? body.phoneNumber.trim() : "";
+  const acceptingNewPatients = body.acceptingNewPatients ?? true;
 
-  if (!displayName || !specialty || !language) {
+  if (
+    !displayName ||
+    !specialty ||
+    !language ||
+    !location ||
+    !phoneNumber
+  ) {
     return c.json(
-      { error: "displayName, specialty, and language are required" },
+      {
+        error:
+          "displayName, specialty, language, location, and phoneNumber are required",
+      },
       400
     );
   }
@@ -158,14 +167,13 @@ app.post("/api/specialists", async (c) => {
       specialty,
       language,
       location,
+      phoneNumber,
       acceptingNewPatients,
     },
   });
 
   return c.json(specialist, 201);
 });
-
-
 app.get("/api/specialists", async (c) => {
   const search = c.req.query("search")?.trim();
   const specialty = c.req.query("specialty")?.trim();
