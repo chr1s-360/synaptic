@@ -123,7 +123,6 @@ app.get("/api/inbound", async (c) => {
   return c.json(tickets);
 });
 
-
 app.post("/api/specialists", async (c) => {
   const body = await c.req.json();
 
@@ -131,16 +130,32 @@ app.post("/api/specialists", async (c) => {
     typeof body.displayName === "string" ? body.displayName.trim() : "";
   const specialty =
     typeof body.specialty === "string" ? body.specialty.trim() : "";
-  const language =
-    typeof body.language === "string" ? body.language.trim() : "";
   const location =
-    typeof body.location === "string" ? body.location.trim() : undefined;
-  const acceptingNewPatients =
-    body.acceptingNewPatients ?? true;
+    typeof body.location === "string" ? body.location.trim() : "";
+  const phoneNumber =
+    typeof body.phoneNumber === "string" ? body.phoneNumber.trim() : "";
 
-  if (!displayName || !specialty || !language) {
+  const languages: string[] = Array.isArray(body.languages)
+    ? body.languages
+        .filter((language: unknown) => typeof language === "string")
+        .map((language: string) => language.trim())
+        .filter((language: string) => language.length > 0)
+    : [];
+
+  const acceptingNewPatients = body.acceptingNewPatients ?? true;
+
+  if (
+    !displayName ||
+    !specialty ||
+    !location ||
+    !phoneNumber ||
+    languages.length === 0
+  ) {
     return c.json(
-      { error: "displayName, specialty, and language are required" },
+      {
+        error:
+          "displayName, specialty, location, phoneNumber, and at least one language are required",
+      },
       400
     );
   }
@@ -156,15 +171,15 @@ app.post("/api/specialists", async (c) => {
     data: {
       displayName,
       specialty,
-      language,
       location,
+      phoneNumber,
+      languages,
       acceptingNewPatients,
     },
   });
 
   return c.json(specialist, 201);
 });
-
 
 app.get("/api/specialists", async (c) => {
   const search = c.req.query("search")?.trim();
@@ -183,7 +198,7 @@ app.get("/api/specialists", async (c) => {
           }
         : {}),
       ...(specialty ? { specialty } : {}),
-      ...(language ? { language } : {}),
+      ...(language ? { languages: { has: language } } : {}),
       ...(acceptingOnly ? { acceptingNewPatients: true } : {}),
     },
     orderBy: {

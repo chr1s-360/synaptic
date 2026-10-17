@@ -124,19 +124,19 @@ export default function Page() {
   const bestChoice = filteredHospitals[0];
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
       {/* Top emergency announcement bar */}
-      <div className="bg-rose-600 text-white text-xs sm:text-sm font-medium py-2.5 px-4">
+      <div className="bg-rose-950/80 border-b border-rose-800/60 text-rose-200 text-xs sm:text-sm font-medium py-2 px-4 backdrop-blur-md">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 shrink-0 animate-pulse text-rose-200" />
+            <AlertTriangle className="h-4 w-4 shrink-0 animate-pulse text-rose-400" />
             <span>
-              <strong>Life-threatening emergency?</strong> Call <strong>911</strong> immediately instead of driving.
+              <strong className="text-white">Life-threatening emergency?</strong> Call <strong className="text-white">911</strong> immediately instead of driving.
             </span>
           </div>
           <a
             href="tel:911"
-            className="inline-flex items-center gap-1 font-bold underline hover:text-rose-100 whitespace-nowrap ml-4"
+            className="inline-flex items-center gap-1 font-bold text-rose-300 underline hover:text-white whitespace-nowrap ml-4 transition-colors"
           >
             <PhoneCall className="h-3.5 w-3.5" /> Call 911
           </a>
@@ -144,30 +144,30 @@ export default function Page() {
       </div>
 
       {/* Navigation header */}
-      <header className="border-b bg-white sticky top-0 z-30 shadow-sm">
+      <header className="border-b border-slate-800/80 bg-slate-900/90 backdrop-blur-md sticky top-0 z-30 shadow-lg">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <SynapticLogo className="h-10 w-auto" />
-            <div className="hidden sm:flex items-center gap-3 border-l border-slate-200 pl-3">
+            <SynapticLogo className="h-10 w-auto text-white" />
+            <div className="hidden sm:flex items-center gap-3 border-l border-slate-800 pl-3">
               <Link
                 href="/"
-                className="text-xs text-slate-500 font-medium block leading-tight hover:underline"
+                className="text-xs text-slate-400 font-medium block leading-tight hover:text-slate-200 transition-colors"
               >
                 Emergency Hospital Router
               </Link>
               <span
-                className="text-xs text-slate-500 font-medium block leading-tight underline"
+                className="text-xs text-indigo-400 font-semibold block leading-tight"
               >
                 Specialist Directory
               </span>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="hidden md:flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="hidden md:flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-full border border-emerald-800/60">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               Live Wait Times Active
             </div>
-            <Button variant="outline" size="sm" className="text-xs">
+            <Button variant="outline" size="sm" className="text-xs bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white">
               ER Protocol Guide
             </Button>
           </div>
@@ -175,35 +175,45 @@ export default function Page() {
       </header>
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-b from-white to-slate-100 border-b py-10 px-4">
-        <div className="max-w-4xl mx-auto text-center space-y-4"> 
+      <section className="bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 border-b border-slate-800/80 py-12 px-4">
+        <div className="max-w-4xl mx-auto text-center space-y-4">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-indigo-950/60 border border-indigo-800/60 text-indigo-300 text-xs font-semibold backdrop-blur-sm">
+            <Activity className="h-3.5 w-3.5 text-indigo-400" />
+            Specialist Physician Directory &amp; Real-time Access
+          </div>
+          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
+            Connect with board-certified specialists <span className="text-indigo-400">near you</span>.
+          </h1>
+          <p className="text-slate-400 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
+            Find vetted ENT, pediatric, cardiology, and orthopedics specialists alongside real-time urgent clinics for intermediate care.
+          </p>
 
-          {/* Location & Quick Search Controls */}
-          <div className="bg-white p-3 sm:p-4 rounded-xl shadow-lg border border-slate-200 max-w-2xl mx-auto mt-6 space-y-3 text-left">
+          {/* Quick Search Controls */}
+          <div className="bg-slate-900/90 p-3 sm:p-4 rounded-2xl shadow-2xl border border-slate-800 max-w-2xl mx-auto mt-6 space-y-3 text-left backdrop-blur-xl">
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Filter by specialty (e.g. Pediatrics, Trauma)"
-                  className="pl-9 h-11 text-sm bg-slate-50 focus:bg-white"
+                  placeholder="Filter by specialty (e.g. Pediatrics, Trauma, ENT)"
+                  className="pl-9 h-11 text-sm bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:ring-indigo-500"
                 />
               </div>
             </div>
 
             {/* Filter pills & sort selectors */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-slate-500 font-medium flex items-center gap-1 mr-1">
+                <span className="text-slate-400 font-medium flex items-center gap-1 mr-1">
                   <SlidersHorizontal className="h-3 w-3" /> Filters:
                 </span>
                 <button
                   type="button"
                   onClick={() => setSeverityFilter("all")}
                   className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "all"
-                      ? "bg-slate-900 text-white border-slate-900"
-                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
+                      : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
                     }`}
                 >
                   All Facilities
@@ -212,8 +222,8 @@ export default function Page() {
                   type="button"
                   onClick={() => setSeverityFilter("level1")}
                   className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "level1"
-                      ? "bg-slate-900 text-white border-slate-900"
-                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
+                      : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
                     }`}
                 >
                   Level 1 Trauma
@@ -222,8 +232,8 @@ export default function Page() {
                   type="button"
                   onClick={() => setSeverityFilter("pediatric")}
                   className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "pediatric"
-                      ? "bg-slate-900 text-white border-slate-900"
-                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
+                      : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
                     }`}
                 >
                   Pediatric Units
@@ -231,11 +241,11 @@ export default function Page() {
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-slate-500 font-medium">Sort by:</span>
+                <span className="text-slate-400 font-medium">Sort by:</span>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
-                  className="bg-slate-50 border border-slate-200 rounded-md py-1 px-2 text-xs font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="bg-slate-950 border border-slate-800 rounded-md py-1 px-2.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 >
                   <option value="totalTime">Total Time (Fastest Care)</option>
                   <option value="waitTime">Shortest ER Wait</option>
@@ -249,14 +259,14 @@ export default function Page() {
 
       {/* Main Content Area */}
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
-
         {/* Specialist Cards Grid */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-              <User2 className="h-4 w-4 text-slate-600" />
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <User2 className="h-4 w-4 text-indigo-400" />
               Matching Specialists ({filteredHospitals.length})
             </h3>
+            <span className="text-xs text-slate-400">Live triage metrics refreshed</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -266,55 +276,54 @@ export default function Page() {
               return (
                 <div
                   key={hospital.id}
-                  className={`bg-white rounded-xl border p-5 transition hover:shadow-md space-y-4 relative`}
+                  className="bg-slate-900/90 rounded-2xl border border-slate-800 p-5 transition hover:shadow-xl space-y-4 relative"
                 >
-
                   <div>
-                    <h4 className="font-bold text-slate-900 text-base">{hospital.name}</h4>
-                    <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
-                      <MapPin className="h-3 w-3" /> {hospital.address} • {hospital.distanceMiles} miles away
+                    <h4 className="font-bold text-white text-base">{hospital.name}</h4>
+                    <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                      <MapPin className="h-3 w-3 text-slate-500" /> {hospital.address} • {hospital.distanceMiles} miles away
                     </p>
                   </div>
 
                   {/* Metrics Bar */}
-                  <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 text-center">
+                  <div className="grid grid-cols-3 gap-2 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 text-center">
                     <div>
-                      <span className="text-[11px] text-slate-500 block flex items-center justify-center gap-1">
-                        <Car className="h-3 w-3 text-slate-400" /> Driving
+                      <span className="text-[11px] text-slate-400 block flex items-center justify-center gap-1">
+                        <Car className="h-3 w-3 text-blue-400" /> Driving
                       </span>
-                      <span className="text-sm font-bold text-slate-800">{hospital.driveTimeMin} mins</span>
+                      <span className="text-sm font-bold text-slate-200">{hospital.driveTimeMin} mins</span>
                     </div>
 
                     <div>
-                      <span className="text-[11px] text-slate-500 block flex items-center justify-center gap-1">
-                        <Clock className="h-3 w-3 text-slate-400" /> ER Wait
+                      <span className="text-[11px] text-slate-400 block flex items-center justify-center gap-1">
+                        <Clock className="h-3 w-3 text-amber-400" /> ER Wait
                       </span>
                       <span
                         className={`text-sm font-bold ${hospital.waitTimeMin <= 20
-                            ? "text-emerald-600"
+                            ? "text-emerald-400"
                             : hospital.waitTimeMin <= 40
-                              ? "text-amber-600"
-                              : "text-rose-600"
+                              ? "text-amber-400"
+                              : "text-rose-400"
                           }`}
                       >
                         {hospital.waitTimeMin} mins
                       </span>
                     </div>
 
-                    <div className="border-l border-slate-200">
-                      <span className="text-[11px] text-slate-600 font-medium block">Total to Care</span>
-                      <span className="text-sm font-extrabold text-slate-900">{totalMin} mins</span>
+                    <div className="border-l border-slate-800">
+                      <span className="text-[11px] text-slate-400 font-medium block">Total to Care</span>
+                      <span className="text-sm font-extrabold text-white">{totalMin} mins</span>
                     </div>
                   </div>
 
                   {/* Badges / Specialties */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                        <ShieldCheck className="h-3 w-3 text-emerald-600" /> {hospital.erLevel}
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60">
+                        <ShieldCheck className="h-3 w-3 text-emerald-400" /> {hospital.erLevel}
                       </span>
-                      <span className="text-[11px] text-slate-500">
-                        Available ER Beds: <strong>{hospital.availableBeds}</strong>
+                      <span className="text-[11px] text-slate-400">
+                        Available ER Beds: <strong className="text-slate-200">{hospital.availableBeds}</strong>
                       </span>
                     </div>
 
@@ -322,7 +331,7 @@ export default function Page() {
                       {hospital.specialties.map((spec) => (
                         <span
                           key={spec}
-                          className="text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100"
+                          className="text-[10px] bg-indigo-950/60 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800/50"
                         >
                           {spec}
                         </span>
@@ -331,15 +340,30 @@ export default function Page() {
                   </div>
 
                   {/* Actions */}
-                  <div className="pt-2 flex items-center gap-2 border-t border-slate-100">
+                  <div className="pt-2 flex items-center gap-2 border-t border-slate-800/80">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1 text-xs gap-1.5 h-9 bg-slate-900 hover:bg-slate-800 text-white"
-                      onClick={() => alert(`Calling emergency department: ${hospital.phone}`)}
+                      className="flex-1 text-xs gap-1.5 h-9 bg-slate-950 hover:bg-slate-800 border-slate-800 text-slate-300"
+                      onClick={() => alert(`Calling specialist department: ${hospital.phone}`)}
                     >
-                      <PhoneCall className="h-3.5 w-3.5" />
+                      <PhoneCall className="h-3.5 w-3.5 text-slate-400" />
                       {hospital.phone}
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="flex-1 text-xs gap-1.5 h-9 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold"
+                      onClick={() =>
+                        window.open(
+                          `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+                            hospital.name + " " + hospital.address
+                          )}`,
+                          "_blank"
+                        )
+                      }
+                    >
+                      <Navigation className="h-3.5 w-3.5" />
+                      Directions
                     </Button>
                   </div>
                 </div>
@@ -347,17 +371,16 @@ export default function Page() {
             })}
           </div>
         </div>
-
       </main>
 
       {/* Footer */}
-      <footer className="border-t bg-white py-8 mt-12 text-center text-xs text-slate-500 space-y-2">
+      <footer className="border-t border-slate-800/80 bg-slate-950 py-8 mt-12 text-center text-xs text-slate-400 space-y-2">
         <div className="flex justify-center mb-2">
-          <SynapticLogo className="h-8 w-auto opacity-90" />
+          <SynapticLogo className="h-8 w-auto opacity-90 text-white" />
         </div>
-        <p className="font-medium text-slate-600">Synaptic — Intelligent Emergency Hospital Guidance System</p>
-        <p>Calculates travel time and real-time ER triage waiting queues.</p>
-        <p className="text-rose-600 font-semibold pt-1">
+        <p className="font-medium text-slate-300">Synaptic — Intelligent Emergency Hospital Guidance System</p>
+        <p className="text-slate-500">Calculates travel time and real-time ER triage waiting queues.</p>
+        <p className="text-rose-400 font-semibold pt-1">
           For critical life-threatening emergencies requiring immediate resuscitation, always dial 911 directly.
         </p>
       </footer>

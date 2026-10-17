@@ -65,7 +65,8 @@ export function SynapticLogo({ className = "h-9 w-auto" }: { className?: string 
                 fontSize="82"
                 fontWeight="600"
                 letterSpacing="-1.5px"
-                fill="#0f172a"
+                className="fill-slate-900 dark:fill-white"
+                fill="currentColor"
             >
                 ynaptic
             </text>

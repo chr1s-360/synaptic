@@ -46,14 +46,15 @@ model Specialist {
   id            Int      @id @default(autoincrement())
   displayName   String
   specialty     String
-  language      String
-  location      String?
+  languages      String[]
+  location      String
+  phoneNumber   String
   acceptingNewPatients Boolean @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   @@index([specialty])
-  @@index([language])
+  @@index([languages])
 }
 
 
