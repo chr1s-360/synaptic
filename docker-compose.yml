@@ -30,7 +30,8 @@ services:
     depends_on:
       - postgres # Start after the database
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/hackathon # Hardcoded database credentials are usually a no-go, but totally fine in this situation
+      - DATABASE_URL=${DATABASE_URL}
+      #- DATABASE_URL=postgres://postgres:postgres@postgres:5432/hackathon # Hardcoded database credentials are usually a no-go, but totally fine in this situation
       - JWT_SECRET=${JWT_SECRET:-dev-only-change-me} # Override with a long random value via a root .env file or your shell
     develop:
       watch:
