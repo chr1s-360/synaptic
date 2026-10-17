@@ -16,3 +16,57 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+
+model Patient {
+  id          Int      @id @default(autoincrement())
+  displayName String
+  postalCode  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assessments TriageAssessment[]
+}
+
+model TriageAssessment {
+  id             Int      @id @default(autoincrement())
+  patientId      Int
+  symptoms       String
+  urgency        String   @default("unassessed")
+  assessmentNote String?
+  createdAt      DateTime @default(now())
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([urgency])
+}
+
+model Specialist {
+  id            Int      @id @default(autoincrement())
+  displayName   String
+  specialty     String
+  language      String
+  location      String?
+  acceptingNewPatients Boolean @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([specialty])
+  @@index([language])
+}
+
+
+model InboundTicket {
+  id               String   @id @default(cuid())
+  hospitalId       String
+  chiefComplaint   String
+  patientAge       Int
+  selfReportedSeverity Int
+  status           String   @default("incoming")
+  etaMinutes       Int?
+  latitude         Float?
+  longitude        Float?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}

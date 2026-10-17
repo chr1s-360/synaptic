@@ -52,6 +52,150 @@ app.get("/ping", async (c) => {
   return c.json({ message: "pong" });
 });
 
+
+app.post("/api/inbound", async (c) => {
+  const body = await c.req.json();
+
+  const hospitalId =
+    typeof body.hospitalId === "string" ? body.hospitalId.trim() : "";
+  const chiefComplaint =
+    typeof body.chiefComplaint === "string"
+      ? body.chiefComplaint.trim()
+      : "";
+  const patientAge = body.patientAge;
+  const selfReportedSeverity = body.selfReportedSeverity;
+
+  // Validate the incoming information.
+  if (!hospitalId || !chiefComplaint) {
+    return c.json(
+      { error: "hospitalId and chiefComplaint are required" },
+      400
+    );
+  }
+
+  if (
+    !Number.isInteger(patientAge) ||
+    patientAge < 0 ||
+    patientAge > 130
+  ) {
+    return c.json(
+      { error: "patientAge must be an integer between 0 and 130" },
+      400
+    );
+  }
+
+  if (
+    !Number.isInteger(selfReportedSeverity) ||
+    selfReportedSeverity < 1 ||
+    selfReportedSeverity > 5
+  ) {
+    return c.json(
+      { error: "selfReportedSeverity must be an integer from 1 to 5" },
+      400
+    );
+  }
+
+  // Save the ticket in the database.
+  const ticket = await client.inboundTicket.create({
+    data: {
+      hospitalId,
+      chiefComplaint,
+      patientAge,
+      selfReportedSeverity,
+    },
+  });
+
+  return c.json(ticket, 201);
+});
+
+//get incoming tickets
+
+app.get("/api/inbound", async (c) => {
+  const hospitalId = c.req.query("hospitalId");
+
+  const tickets = await client.inboundTicket.findMany({
+    where: hospitalId ? { hospitalId } : undefined,
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  return c.json(tickets);
+});
+
+
+app.post("/api/specialists", async (c) => {
+  const body = await c.req.json();
+
+  const displayName =
+    typeof body.displayName === "string" ? body.displayName.trim() : "";
+  const specialty =
+    typeof body.specialty === "string" ? body.specialty.trim() : "";
+  const language =
+    typeof body.language === "string" ? body.language.trim() : "";
+  const location =
+    typeof body.location === "string" ? body.location.trim() : undefined;
+  const acceptingNewPatients =
+    body.acceptingNewPatients ?? true;
+
+  if (!displayName || !specialty || !language) {
+    return c.json(
+      { error: "displayName, specialty, and language are required" },
+      400
+    );
+  }
+
+  if (typeof acceptingNewPatients !== "boolean") {
+    return c.json(
+      { error: "acceptingNewPatients must be true or false" },
+      400
+    );
+  }
+
+  const specialist = await client.specialist.create({
+    data: {
+      displayName,
+      specialty,
+      language,
+      location,
+      acceptingNewPatients,
+    },
+  });
+
+  return c.json(specialist, 201);
+});
+
+
+app.get("/api/specialists", async (c) => {
+  const search = c.req.query("search")?.trim();
+  const specialty = c.req.query("specialty")?.trim();
+  const language = c.req.query("language")?.trim();
+  const acceptingOnly = c.req.query("acceptingOnly") === "true";
+
+  const specialists = await client.specialist.findMany({
+    where: {
+      ...(search
+        ? {
+            displayName: {
+              contains: search,
+              mode: "insensitive",
+            },
+          }
+        : {}),
+      ...(specialty ? { specialty } : {}),
+      ...(language ? { language } : {}),
+      ...(acceptingOnly ? { acceptingNewPatients: true } : {}),
+    },
+    orderBy: {
+      displayName: "asc",
+    },
+  });
+
+  return c.json(specialists);
+});
+
+
+
 app.post("/auth/signup", async (c) => {
   const { name, email, password } = await c.req.json();
   if (!email || !password) {
