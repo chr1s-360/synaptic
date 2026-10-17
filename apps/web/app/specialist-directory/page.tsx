@@ -170,7 +170,7 @@ export default function Page() {
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Filter by name"
+                  placeholder="Filter by name, specialty (e.g. Pediatrics, Trauma, ENT)"
                   className="pl-9 h-11 text-sm bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:ring-indigo-500"
                 />
               </div>
