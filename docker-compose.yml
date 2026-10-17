@@ -49,4 +49,4 @@ services:
     environment: # Again, usually not a good idea to use these hardcoded credentials but okay for a hackathon
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
+      POSTGRES_DB: hackathon
