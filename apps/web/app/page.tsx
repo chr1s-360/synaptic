@@ -123,6 +123,7 @@ export default function Page() {
 
   useEffect(() => {
     runRoutingCalculation(originCoords, activeMode, radiusKm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleGeocodeSearch = async (e?: React.FormEvent) => {

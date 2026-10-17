@@ -101,7 +101,7 @@ export default function InteractiveMap({
                 mapInstanceRef.current = null;
             }
         };
-    }, []);
+    }, [facilities, selectedFacilityId, userLocation.lat, userLocation.lng]);
 
     // Update markers and bounds when facilities, userLocation, or selection changes
     useEffect(() => {
