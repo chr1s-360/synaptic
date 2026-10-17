@@ -43,7 +43,7 @@ services:
         - action: rebuild
           path: ./apps/api/package.json
   postgres: # Postgres Database
-    image: postgres:latest
+    image: timescale/timescaledb:latest-pg18
     ports:
       - "5432:5432" # Reachable on localhost:5432 if you want to connect with something like DataGrip
     environment: # Again, usually not a good idea to use these hardcoded credentials but okay for a hackathon
