@@ -55,8 +55,6 @@ const FACILITY_TYPE_OPTIONS = [
   { value: "all", label: "Facility" },
   { value: "hospital", label: "Hospital" },
   { value: "pharmacy", label: "Pharmacy" },
-  { value: "walk-in clinic", label: "Walk-in" },
-  { value: "er", label: "ER" },
 ] as const;
 
 const SAMPLE_HOSPITALS: HospitalItem[] = [
