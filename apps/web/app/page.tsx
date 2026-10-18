@@ -1,1034 +1,170 @@
 "use client";
 
-import { useState, useEffect, useRef, useTransition } from "react";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Button } from "@ui/components/ui/button";
-import { Input } from "@ui/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@ui/components/ui/dialog";
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { SynapticLogo } from "./logo";
-import InteractiveMap, { FacilityMarker } from "./map";
-import { geocodeCanadianAddress } from "./routing-engine";
 import {
-  Clock,
-  Car,
-  Navigation,
-  MapPin,
-  Search,
-  AlertTriangle,
+  User,
   Building2,
-  ShieldCheck,
-  PhoneCall,
+  ArrowRight,
+  ShieldAlert,
   Activity,
-  SlidersHorizontal,
-  BadgeCheck,
-  Stethoscope,
+  HeartPulse,
+  Clock,
   Compass,
-  ExternalLink,
-  Layers,
-  Loader2,
 } from "lucide-react";
 
-interface HospitalItem {
-  id: string;
-  name: string;
-  address: string;
-  phone: string;
-  distanceMiles: number;
-  driveTimeMin: number;
-  waitTimeMin: number;
-  erLevel: string;
-  rating: number;
-  availableBeds: number;
-  specialties: string[];
-  lat: number;
-  lng: number;
-}
-
-const SAMPLE_HOSPITALS: HospitalItem[] = [
-  {
-    id: "1",
-    name: "Toronto General Hospital",
-    address: "200 Elizabeth St, Toronto, ON M5G 2C4",
-    phone: "(416) 340-4800",
-    distanceMiles: 1.2,
-    driveTimeMin: 8,
-    waitTimeMin: 18,
-    erLevel: "Level 1 Trauma",
-    rating: 4.8,
-    availableBeds: 14,
-    specialties: ["Cardiac Care", "Transplant Unit", "Stroke Center", "Trauma"],
-    lat: 43.6591,
-    lng: -79.3882,
-  },
-  {
-    id: "2",
-    name: "Mount Sinai Hospital",
-    address: "600 University Ave, Toronto, ON M5G 1X5",
-    phone: "(416) 586-4800",
-    distanceMiles: 1.1,
-    driveTimeMin: 7,
-    waitTimeMin: 42,
-    erLevel: "Level 2 Trauma",
-    rating: 4.6,
-    availableBeds: 6,
-    specialties: ["General ER", "Women & Infants", "Urgent Surgery"],
-    lat: 43.6575,
-    lng: -79.3905,
-  },
-  {
-    id: "3",
-    name: "St. Michael's Hospital",
-    address: "36 Queen St E, Toronto, ON M5B 1W8",
-    phone: "(416) 360-4000",
-    distanceMiles: 0.8,
-    driveTimeMin: 5,
-    waitTimeMin: 14,
-    erLevel: "Level 1 Trauma",
-    rating: 4.9,
-    availableBeds: 21,
-    specialties: ["Level 1 Adult Trauma", "Neurosurgery", "Cardiac Care"],
-    lat: 43.6534,
-    lng: -79.3772,
-  },
-  {
-    id: "4",
-    name: "SickKids (Hospital for Sick Children)",
-    address: "555 University Ave, Toronto, ON M5G 1X8",
-    phone: "(416) 813-1500",
-    distanceMiles: 1.3,
-    driveTimeMin: 9,
-    waitTimeMin: 22,
-    erLevel: "Level 1 Trauma",
-    rating: 4.9,
-    availableBeds: 18,
-    specialties: ["Pediatrics", "Pediatric Trauma", "Child Emergency"],
-    lat: 43.6578,
-    lng: -79.3867,
-  },
-  {
-    id: "5",
-    name: "Sunnybrook Health Sciences Centre",
-    address: "2075 Bayview Ave, Toronto, ON M4N 3M5",
-    phone: "(416) 480-6100",
-    distanceMiles: 5.4,
-    driveTimeMin: 18,
-    waitTimeMin: 16,
-    erLevel: "Level 1 Trauma",
-    rating: 4.7,
-    availableBeds: 25,
-    specialties: ["Comprehensive Trauma", "Burn Centre", "Brain Sciences"],
-    lat: 43.7250,
-    lng: -79.3764,
-  },
-  {
-    id: "6",
-    name: "Michael Garron Hospital",
-    address: "825 Coxwell Ave, East York, ON M4C 3E7",
-    phone: "(416) 469-6580",
-    distanceMiles: 4.5,
-    driveTimeMin: 15,
-    waitTimeMin: 28,
-    erLevel: "Community Emergency",
-    rating: 4.3,
-    availableBeds: 9,
-    specialties: ["Community Care", "Rapid Diagnostics", "Orthopedics"],
-    lat: 43.6908,
-    lng: -79.3242,
-  },
-];
-
-export default function Page() {
+export default function RoleSelectorPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const [selectedRole, setSelectedRole] = useState<"patient" | "hospital" | null>(null);
 
-  const urlQuery = searchParams.get("query") || "";
-  const urlFilter = searchParams.get("filter") || "all";
-  const urlSort = (searchParams.get("sortBy") as any) || "totalTime";
-
-  const [searchQuery, setSearchQuery] = useState(urlQuery);
-  const mapSectionRef = useRef<HTMLElement | null>(null);
-  const resultsBannerRef = useRef<HTMLDivElement | null>(null);
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Scroll to the recommended-hospital banner so the full hospital text and the map below are visible
-    (resultsBannerRef.current ?? mapSectionRef.current)?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-  };
-  const [userLocation, setUserLocation] = useState("Toronto, ON (default)");
-  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number; label: string }>({
-    lat: 43.6532,
-    lng: -79.3832,
-    label: "Default Location (Toronto City Hall)",
-  });
-  // Routing waits until the browser location prompt has been answered
-  const [locationStatus, setLocationStatus] = useState<"pending" | "granted" | "denied" | "manual">("pending");
-  const [addressInput, setAddressInput] = useState("");
-  const [isGeocoding, setIsGeocoding] = useState(false);
-  const [geocodeError, setGeocodeError] = useState<string | null>(null);
-
-  const handleManualLocation = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const query = addressInput.trim();
-    if (!query) return;
-
-    setIsGeocoding(true);
-    setGeocodeError(null);
-    try {
-      const geo = await geocodeCanadianAddress(query);
-      const label = geo.displayName.split(",").slice(0, 3).join(",").trim();
-      setUserCoords({ lat: geo.lat, lng: geo.lng, label });
-      setUserLocation(label);
-      setLocationStatus("manual");
-    } catch (err: any) {
-      setGeocodeError(err?.message || "Could not find that location");
-    } finally {
-      setIsGeocoding(false);
+  const handleContinue = (role?: "patient" | "hospital") => {
+    const target = role || selectedRole;
+    if (target === "hospital") {
+      router.push("/hospital-portal");
+    } else if (target === "patient") {
+      router.push("/patient-router");
     }
   };
 
-  const requestLocation = () => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setLocationStatus("denied");
-      return;
-    }
-    setLocationStatus("pending");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUserCoords({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          label: "Your Current Location",
-        });
-        setUserLocation("Your current location");
-        setLocationStatus("granted");
-      },
-      () => setLocationStatus("denied"),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-    );
-  };
-
-  useEffect(() => {
-    requestLocation();
-  }, []);
-
-  const [hospitals, setHospitals] = useState<HospitalItem[]>(SAMPLE_HOSPITALS);
-  const [selectedHospitalId, setSelectedHospitalId] = useState<string>("3");
-  const [sortBy, setSortBy] = useState<"totalTime" | "waitTime" | "driveTime">(urlSort);
-  const [severityFilter, setSeverityFilter] = useState<"all" | "level1" | "pediatric" | "hospital">(
-    (urlFilter as any) || "all"
-  );
-  const [mapMode, setMapMode] = useState<"interactive" | "streamlit">("interactive");
-  const [loading, setLoading] = useState<boolean>(false);
-  const [totalDatasetCount, setTotalDatasetCount] = useState<number>(SAMPLE_HOSPITALS.length);
-
-  // Synchronize state with URL parameters (router-driven)
-  const updateRoute = (newQuery: string, newFilter: string, newSort: string) => {
-    const params = new URLSearchParams();
-    if (newQuery) params.set("query", newQuery);
-    if (newFilter && newFilter !== "all") params.set("filter", newFilter);
-    if (newSort && newSort !== "totalTime") params.set("sortBy", newSort);
-    router.replace(`/?${params.toString()}`);
-  };
-
-  // Fetch real facilities from the healthcare dataset via router parameters
-  useEffect(() => {
-    // Don't route until the user has answered the location prompt
-    if (locationStatus === "pending") return;
-
-    let ignore = false;
-    async function fetchFacilities() {
-      setLoading(true);
-      try {
-        const params = new URLSearchParams();
-        if (searchQuery.trim()) params.set("query", searchQuery.trim());
-        if (severityFilter !== "all") params.set("filter", severityFilter);
-        params.set("sortBy", sortBy);
-        params.set("lat", userCoords.lat.toString());
-        params.set("lng", userCoords.lng.toString());
-        params.set("limit", "100");
-
-        const res = await fetch(`/api/facilities?${params.toString()}`);
-        if (!res.ok) throw new Error("API error");
-        const data = await res.json();
-        if (!ignore && data.facilities) {
-          setHospitals(data.facilities);
-          setTotalDatasetCount(data.totalCount || data.facilities.length);
-          if (data.facilities.length > 0) {
-            setSelectedHospitalId(data.facilities[0].id);
-          }
-        }
-      } catch (err) {
-        console.warn("Failed loading live facilities, using fallback:", err);
-      } finally {
-        if (!ignore) setLoading(false);
-      }
-    }
-
-    const timer = setTimeout(() => {
-      fetchFacilities();
-    }, 250);
-
-    return () => {
-      ignore = true;
-      clearTimeout(timer);
-    };
-  }, [searchQuery, severityFilter, sortBy, userCoords.lat, userCoords.lng, locationStatus]);
-
-  const bestChoice = hospitals[0];
-
-  // ---------- Patient intake -> inbound ticket ----------
-  const SEVERITY_LEVELS = [
-    { value: 1, label: "1 · Minor" },
-    { value: 2, label: "2 · Mild" },
-    { value: 3, label: "3 · Moderate" },
-    { value: 4, label: "4 · Severe" },
-    { value: 5, label: "5 · Critical" },
-  ];
-  const EMPTY_INTAKE = { name: "", phone: "", email: "", age: "", symptoms: "", severity: 3 };
-
-  const [ticketHospital, setTicketHospital] = useState<HospitalItem | null>(null);
-  const [intake, setIntake] = useState(EMPTY_INTAKE);
-  const [ticketSubmitting, setTicketSubmitting] = useState(false);
-  const [ticketError, setTicketError] = useState<string | null>(null);
-  const [ticketSent, setTicketSent] = useState(false);
-
-  const openTicketForm = (hospital: HospitalItem) => {
-    setSelectedHospitalId(hospital.id);
-    setTicketHospital(hospital);
-    setTicketError(null);
-    setTicketSent(false);
-  };
-
-  const closeTicketForm = () => {
-    setTicketHospital(null);
-    setTicketError(null);
-    if (ticketSent) setIntake(EMPTY_INTAKE);
-    setTicketSent(false);
-  };
-
-  const handleTicketSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!ticketHospital) return;
-
-    const age = Number(intake.age);
-    if (!intake.name.trim()) return setTicketError("Please enter your name.");
-    if (!intake.phone.trim()) return setTicketError("Please enter a phone number.");
-    if (!/^\S+@\S+\.\S+$/.test(intake.email.trim())) return setTicketError("Please enter a valid email.");
-    if (!Number.isInteger(age) || age < 0 || age > 130) return setTicketError("Age must be a whole number from 0 to 130.");
-    if (!intake.symptoms.trim()) return setTicketError("Please describe your symptoms.");
-
-    setTicketSubmitting(true);
-    setTicketError(null);
-    try {
-      // Name, phone and email are collected for the patient only — they are NOT sent
-      // or stored. The ticket carries just what the hospital needs to gauge incoming traffic.
-      const res = await fetch("/api/inbound", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          hospitalId: ticketHospital.id,
-          chiefComplaint: intake.symptoms.trim(),
-          patientAge: age,
-          selfReportedSeverity: intake.severity,
-          etaMinutes: ticketHospital.driveTimeMin,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error || `Request failed (${res.status})`);
-      }
-      setTicketSent(true);
-    } catch (err: any) {
-      setTicketError(err?.message || "Could not send your arrival notice. Please try again.");
-    } finally {
-      setTicketSubmitting(false);
-    }
-  };
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      {/* Top emergency announcement bar */}
-      <div className="bg-rose-950/80 border-b border-rose-800/60 text-rose-200 text-xs sm:text-sm font-medium py-2 px-4 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 shrink-0 animate-pulse text-rose-400" />
-            <span>
-              <strong className="text-white">Life-threatening emergency?</strong> Call <strong className="text-white">911</strong> immediately instead of driving.
-            </span>
-          </div>
-          <a
-            href="tel:911"
-            className="inline-flex items-center gap-1 font-bold text-rose-300 underline hover:text-white whitespace-nowrap ml-4 transition-colors"
-          >
-            <PhoneCall className="h-3.5 w-3.5" /> Call 911
-          </a>
-        </div>
-      </div>
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-hidden">
+      {/* Background Ambient Glows */}
+      <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-emerald-600/15 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Navigation header */}
-      <header className="border-b border-slate-800/80 bg-slate-900/90 backdrop-blur-md sticky top-0 z-30 shadow-lg">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <SynapticLogo className="h-10 w-auto text-white" />
-            <div className="hidden sm:flex items-center gap-3 border-l border-slate-800 pl-3">
-              <span
-                className="text-xs text-indigo-400 font-semibold block leading-tight"
-              >
-                Emergency Hospital Router
-              </span>
-              <Link
-                href="/specialist-directory"
-                className="text-xs text-slate-400 font-medium block leading-tight hover:text-slate-200 transition-colors"
-              >
-                Specialist Directory
-              </Link>
-              <Link
-                href="/hospital-portal"
-                className="text-xs text-slate-400 font-medium block leading-tight hover:text-slate-200 transition-colors"
-              >
-                Hospital Portal
-              </Link>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden md:flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-full border border-emerald-800/60">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              Live Wait Times Active
-            </div>
-            <Button variant="outline" size="sm" className="text-xs bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white">
-              ER Protocol Guide
-            </Button>
-          </div>
+      {/* Header */}
+      <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <SynapticLogo className="h-9 w-auto text-white" />
+          <span className="text-xs uppercase tracking-wider font-semibold text-indigo-400 bg-indigo-950/80 px-2.5 py-0.5 rounded-full border border-indigo-700/60">
+            Unified Portal Access
+          </span>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 border-b border-slate-800/80 py-12 px-4">
-        <div className="max-w-4xl mx-auto text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-indigo-950/60 border border-indigo-800/60 text-indigo-300 text-xs font-semibold backdrop-blur-sm">
-            <Activity className="h-3.5 w-3.5 text-indigo-400" />
-            Total Time = Travel Duration + Real-time ER Triage Wait Time
+      {/* Main Content */}
+      <main className="max-w-4xl mx-auto px-4 py-12 flex-1 flex flex-col items-center justify-center w-full z-10">
+        <div className="text-center max-w-xl mb-10 space-y-3">
+          <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-indigo-400 bg-indigo-950/80 border border-indigo-700/60 px-3 py-1 rounded-full">
+            <Activity className="w-3.5 h-3.5 text-indigo-400" />
+            Role Selection
           </div>
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
-            Find the fastest emergency room to get care <span className="text-emerald-400">right now</span>.
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+            Who is accessing Synaptic?
           </h1>
-          <p className="text-slate-400 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
-            The closest hospital isn&apos;t always the fastest. We calculate real-time driving traffic and current ER
-            queue wait times to find your fastest path to a physician.
+          <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
+            Select your portal to proceed to real-time emergency routing or hospital staff coordination.
           </p>
-
-          {/* Location & Quick Search Controls */}
-          <div className="bg-slate-900/90 p-3 sm:p-4 rounded-2xl shadow-2xl border border-slate-800 max-w-2xl mx-auto mt-6 space-y-3 text-left backdrop-blur-xl">
-            <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSearchQuery(val);
-                    updateRoute(val, severityFilter, sortBy);
-                  }}
-                  placeholder="Search health facilities (e.g. Toronto General, SickKids, Pharmacy, Clinic)..."
-                  className="pl-9 h-11 text-sm bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:ring-indigo-500"
-                />
-              </div>
-              <Button
-                type="submit"
-                className="h-11 px-5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold"
-              >
-                Search
-              </Button>
-            </form>
-
-            {/* Filter pills & sort selectors */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-slate-400 font-medium flex items-center gap-1 mr-1">
-                  <SlidersHorizontal className="h-3 w-3" /> Filters:
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSeverityFilter("level1");
-                    updateRoute(searchQuery, "level1", sortBy);
-                  }}
-                  className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "level1"
-                    ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
-                    : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
-                    }`}
-                >
-                  Level 1 Trauma
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSeverityFilter("pediatric");
-                    updateRoute(searchQuery, "pediatric", sortBy);
-                  }}
-                  className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "pediatric"
-                    ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
-                    : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
-                    }`}
-                >
-                  Pediatric Units
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-slate-400 font-medium">Sort by:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => {
-                    const val = e.target.value as any;
-                    setSortBy(val);
-                    updateRoute(searchQuery, severityFilter, val);
-                  }}
-                  className="bg-slate-950 border border-slate-800 rounded-md py-1 px-2.5 text-xs font-medium text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                >
-                  <option value="totalTime">Total Time (Fastest Care)</option>
-                  <option value="waitTime">Shortest ER Wait</option>
-                  <option value="driveTime">Shortest Drive</option>
-                  <option value="distance">Nearest Distance</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Main Content Area */}
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
-        {/* Location status & manual entry */}
-        <div className="bg-amber-950/40 border border-amber-700/50 text-amber-200 rounded-xl px-4 py-3 text-xs sm:text-sm space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <span className="flex items-center gap-2">
-              <Compass className="h-4 w-4 shrink-0 text-amber-400" />
-              {locationStatus === "pending"
-                ? "Waiting for your location permission — or enter your location below."
-                : locationStatus === "denied"
-                  ? `Location unavailable — routing from ${userLocation}. Enter your location below for accurate travel times.`
-                  : `Routing from ${userLocation}`}
-            </span>
-            {locationStatus !== "granted" && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={requestLocation}
-                className="text-xs bg-slate-900 border-amber-700/60 text-amber-200 hover:bg-slate-800"
-              >
-                Use my location
-              </Button>
-            )}
-          </div>
-
-          <form onSubmit={handleManualLocation} className="flex flex-col sm:flex-row gap-2">
-            <Input
-              value={addressInput}
-              onChange={(e) => setAddressInput(e.target.value)}
-              placeholder="Enter an address, city or postal code (e.g. 100 Queen St W, Toronto)"
-              className="h-9 text-xs bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500"
-            />
-            <Button
-              type="submit"
-              size="sm"
-              disabled={isGeocoding || !addressInput.trim()}
-              className="h-9 text-xs bg-indigo-600 hover:bg-indigo-500 text-white"
-            >
-              {isGeocoding ? "Locating…" : "Set location"}
-            </Button>
-          </form>
-          {geocodeError && <p className="text-rose-300 text-xs">{geocodeError}</p>}
         </div>
 
-        {/* Recommended Best Option Spotlight Banner */}
-        {bestChoice && (
-          <div
-            ref={resultsBannerRef}
-            className="scroll-mt-20 bg-gradient-to-r from-emerald-950/40 via-slate-900 to-indigo-950/40 border border-emerald-500/40 rounded-2xl p-5 sm:p-6 shadow-xl backdrop-blur-md"
+        {/* Role Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+          {/* Patient Card */}
+          <button
+            type="button"
+            onClick={() => handleContinue("patient")}
+            onMouseEnter={() => setSelectedRole("patient")}
+            className={`group text-left p-6 sm:p-7 rounded-2xl border transition-all duration-200 relative flex flex-col justify-between bg-slate-900/80 hover:bg-slate-900 shadow-xl backdrop-blur-md ${
+              selectedRole === "patient"
+                ? "border-indigo-500 ring-2 ring-indigo-500/40 shadow-indigo-950/50"
+                : "border-slate-800 hover:border-slate-700"
+            }`}
           >
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-300 bg-emerald-950/80 border border-emerald-700/60 px-2.5 py-0.5 rounded-full">
-                  <BadgeCheck className="h-3.5 w-3.5 text-emerald-400" />
-                  Recommended Fastest Route
+            <div>
+              <div className="flex items-center justify-between mb-5">
+                <div className="w-12 h-12 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <User className="w-6 h-6" />
                 </div>
-                <h2 className="text-xl sm:text-2xl font-bold text-white">{bestChoice.name}</h2>
-                <p className="text-xs sm:text-sm text-slate-400 flex items-center gap-1">
-                  <MapPin className="h-3.5 w-3.5 text-slate-500" /> {bestChoice.address}
-                </p>
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider bg-slate-950 px-2.5 py-1 rounded-full border border-slate-800">
+                  Public Access
+                </span>
               </div>
 
-              {/* Total Time Badge */}
-              <div className="flex items-center gap-3 sm:gap-4 bg-slate-950/90 p-3.5 rounded-xl border border-slate-800 shadow-md w-full md:w-auto justify-between md:justify-start">
-                <div className="text-center px-1 sm:px-2">
-                  <span className="text-[11px] text-slate-400 block font-medium">Drive Time</span>
-                  <span className="text-base sm:text-lg font-bold text-blue-400 flex items-center justify-center gap-1">
-                    <Car className="h-4 w-4 text-blue-400" /> {bestChoice.driveTimeMin}m
-                  </span>
-                </div>
-                <span className="text-slate-600 text-lg font-light">+</span>
-                <div className="text-center px-1 sm:px-2">
-                  <span className="text-[11px] text-slate-400 block font-medium">ER Wait</span>
-                  <span className="text-base sm:text-lg font-bold text-amber-400 flex items-center justify-center gap-1">
-                    <Clock className="h-4 w-4 text-amber-400" /> {bestChoice.waitTimeMin}m
-                  </span>
-                </div>
-                <div className="border-l border-slate-800 pl-3 sm:pl-4 text-center">
-                  <span className="text-[11px] text-emerald-400 font-bold block uppercase">Total Estimated</span>
-                  <span className="text-2xl font-black text-emerald-400">
-                    {bestChoice.driveTimeMin + bestChoice.waitTimeMin} min
-                  </span>
-                </div>
-              </div>
+              <h2 className="text-xl font-bold text-white mb-2 group-hover:text-indigo-300 transition-colors">
+                Patient / Care Seeker
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-6">
+                Find nearest emergency care with live wait times, traffic routing, AI clinical navigator, and pre-arrival intake.
+              </p>
 
-              <div className="w-full md:w-auto flex flex-col sm:flex-row gap-2">
-                <Button
-                  className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center justify-center gap-2"
-                  onClick={() => openTicketForm(bestChoice)}
-                >
-                  <ShieldCheck className="h-4 w-4" /> Choose this hospital
-                </Button>
-                <Button
-                  className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/40"
-                  onClick={() =>
-                    window.open(
-                      `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
-                        bestChoice.name + " " + bestChoice.address
-                      )}`,
-                      "_blank"
-                    )
-                  }
-                >
-                  <Navigation className="h-4 w-4" /> Start Directions
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Interactive Accessibility Map Container */}
-        <section
-          ref={mapSectionRef}
-          className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl overflow-hidden scroll-mt-20"
-        >
-          <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950/70">
-            <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-sm">
-                <Compass className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  Interactive Healthcare Travel-Time Map
-                  <span className="text-[11px] font-semibold text-indigo-300 bg-indigo-950/80 px-2 py-0.5 rounded-full border border-indigo-700/60">
-                    Live OpenStreetMap
-                  </span>
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Real-time hospital facility mapping with total travel-time bands to emergency care
-                </p>
+              <div className="space-y-2 border-t border-slate-800/80 pt-4 text-xs text-slate-400">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Real-time ER queues & travel duration</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Compass className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Interactive healthcare travel map</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <HeartPulse className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>AI Symptom Navigator & triage assistance</span>
+                </div>
               </div>
             </div>
 
-            {/* Map Mode Toggle & External Link */}
-            <div className="flex items-center gap-2">
-              <div className="inline-flex rounded-lg border border-slate-800 bg-slate-950 p-0.5 text-xs shadow-xs">
-                <button
-                  type="button"
-                  onClick={() => setMapMode("interactive")}
-                  className={`px-3 py-1 font-medium rounded-md transition ${mapMode === "interactive"
-                    ? "bg-indigo-600 text-white shadow-xs"
-                    : "text-slate-400 hover:text-white"
-                    }`}
-                >
-                  Native Interactive Map
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMapMode("streamlit")}
-                  className={`px-3 py-1 font-medium rounded-md transition ${mapMode === "streamlit"
-                    ? "bg-indigo-600 text-white shadow-xs"
-                    : "text-slate-400 hover:text-white"
-                    }`}
-                >
-                  Streamlit Routing Hub
-                </button>
-              </div>
-
-              <a
-                href="http://localhost:8501"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-200 bg-slate-900 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 shadow-xs transition"
-              >
-                <ExternalLink className="h-3.5 w-3.5 text-slate-400" /> Full Screen
-              </a>
+            <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between font-semibold text-sm text-indigo-400 group-hover:text-indigo-300">
+              <span>Go to Patient Home</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </div>
-          </div>
+          </button>
 
-          <div className="relative w-full bg-slate-950">
-            {mapMode === "interactive" ? (
-              <InteractiveMap
-                userLocation={userCoords}
-                facilities={hospitals.map((h) => ({
-                  id: h.id,
-                  name: h.name,
-                  type: h.erLevel,
-                  address: h.address,
-                  lat: h.lat,
-                  lng: h.lng,
-                  driveTimeMin: h.driveTimeMin,
-                  waitTimeMin: h.waitTimeMin,
-                  totalTimeMin: h.driveTimeMin + h.waitTimeMin,
-                }))}
-                selectedFacilityId={selectedHospitalId}
-                onSelectFacility={(id) => setSelectedHospitalId(id)}
-                height="560px"
-              />
-            ) : (
-              <div className="h-[620px] w-full">
-                <iframe
-                  src="http://localhost:8501/?embedded=true"
-                  title="Synaptic Healthcare Travel-Time Accessibility Map"
-                  className="w-full h-full border-0"
-                  loading="lazy"
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="p-3.5 bg-slate-950/80 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
-            <div className="flex items-center gap-3">
-              <span className="flex items-center gap-1 font-medium text-slate-300">
-                <Layers className="h-3.5 w-3.5 text-slate-500" /> Time to Care Bands:
-              </span>
-              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[#16803C]"></span> &le; 20m</span>
-              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[#2563EB]"></span> 21–35m</span>
-              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[#D97706]"></span> 36–50m</span>
-              <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-[#DC2626]"></span> &gt; 50m</span>
-            </div>
-            <span>Click any marker to view triage metrics &amp; direct navigation</span>
-          </div>
-        </section>
-
-        {/* Hospital Cards Grid */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-indigo-400" />
-              Healthcare Facilities Found ({hospitals.length} of {totalDatasetCount})
-              {loading && <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />}
-            </h3>
-            <span className="text-xs text-slate-400">Live triage metrics from Ontario dataset</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {hospitals.map((hospital, idx) => {
-              const totalMin = hospital.driveTimeMin + hospital.waitTimeMin;
-              const isBest = idx === 0;
-
-              return (
-                <div
-                  key={hospital.id}
-                  className={`bg-slate-900/90 rounded-2xl border p-5 transition hover:shadow-xl space-y-4 relative ${isBest ? "border-emerald-500/50 ring-1 ring-emerald-500/20" : "border-slate-800"
-                    }`}
-                >
-                  {isBest && (
-                    <span className="absolute top-3 right-3 bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                      Shortest Total Time
-                    </span>
-                  )}
-
-                  <div>
-                    <h4 className="font-bold text-white text-base">{hospital.name}</h4>
-                    <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-                      <MapPin className="h-3 w-3 text-slate-500" /> {hospital.address} • {hospital.distanceMiles} miles away
-                    </p>
-                  </div>
-
-                  {/* Metrics Bar */}
-                  <div className="grid grid-cols-3 gap-2 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 text-center">
-                    <div>
-                      <span className="text-[11px] text-slate-400 block flex items-center justify-center gap-1">
-                        <Car className="h-3 w-3 text-blue-400" /> Driving
-                      </span>
-                      <span className="text-sm font-bold text-slate-200">{hospital.driveTimeMin} mins</span>
-                    </div>
-
-                    <div>
-                      <span className="text-[11px] text-slate-400 block flex items-center justify-center gap-1">
-                        <Clock className="h-3 w-3 text-amber-400" /> ER Wait
-                      </span>
-                      <span
-                        className={`text-sm font-bold ${hospital.waitTimeMin <= 20
-                          ? "text-emerald-400"
-                          : hospital.waitTimeMin <= 40
-                            ? "text-amber-400"
-                            : "text-rose-400"
-                          }`}
-                      >
-                        {hospital.waitTimeMin} mins
-                      </span>
-                    </div>
-
-                    <div className="border-l border-slate-800">
-                      <span className="text-[11px] text-slate-400 font-medium block">Total to Care</span>
-                      <span className="text-sm font-extrabold text-white">{totalMin} mins</span>
-                    </div>
-                  </div>
-
-                  {/* Badges / Specialties */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60">
-                        <ShieldCheck className="h-3 w-3 text-emerald-400" /> {hospital.erLevel}
-                      </span>
-                      <span className="text-[11px] text-slate-400">
-                        Available ER Beds: <strong className="text-slate-200">{hospital.availableBeds}</strong>
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1">
-                      {hospital.specialties.map((spec) => (
-                        <span
-                          key={spec}
-                          className="text-[10px] bg-indigo-950/60 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800/50"
-                        >
-                          {spec}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="pt-2 flex flex-wrap items-center gap-2 border-t border-slate-800/80">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 text-xs gap-1.5 h-9 bg-slate-950 hover:bg-slate-800 border-slate-800 text-slate-300"
-                      onClick={() => alert(`Calling emergency department: ${hospital.phone}`)}
-                    >
-                      <PhoneCall className="h-3.5 w-3.5 text-slate-400" />
-                      {hospital.phone}
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="flex-1 text-xs gap-1.5 h-9 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold"
-                      onClick={() =>
-                        window.open(
-                          `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
-                            hospital.name + " " + hospital.address
-                          )}`,
-                          "_blank"
-                        )
-                      }
-                    >
-                      <Navigation className="h-3.5 w-3.5" />
-                      Directions
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="w-full text-xs gap-1.5 h-9 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
-                      onClick={() => openTicketForm(hospital)}
-                    >
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      Choose this hospital
-                    </Button>
-                  </div>
+          {/* Hospital Staff Card */}
+          <button
+            type="button"
+            onClick={() => handleContinue("hospital")}
+            onMouseEnter={() => setSelectedRole("hospital")}
+            className={`group text-left p-6 sm:p-7 rounded-2xl border transition-all duration-200 relative flex flex-col justify-between bg-slate-900/80 hover:bg-slate-900 shadow-xl backdrop-blur-md ${
+              selectedRole === "hospital"
+                ? "border-emerald-500 ring-2 ring-emerald-500/40 shadow-emerald-950/50"
+                : "border-slate-800 hover:border-slate-700"
+            }`}
+          >
+            <div>
+              <div className="flex items-center justify-between mb-5">
+                <div className="w-12 h-12 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <Building2 className="w-6 h-6" />
                 </div>
-              );
-            })}
-          </div>
+                <span className="text-[11px] font-semibold text-emerald-300 uppercase tracking-wider bg-emerald-950/80 px-2.5 py-1 rounded-full border border-emerald-700/60">
+                  Staff Only
+                </span>
+              </div>
+
+              <h2 className="text-xl font-bold text-white mb-2 group-hover:text-emerald-300 transition-colors">
+                Hospital ED Staff
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-6">
+                Monitor live incoming patient tickets, assess severity levels, view travel ETAs, and manage triage status in real time.
+              </p>
+
+              <div className="space-y-2 border-t border-slate-800/80 pt-4 text-xs text-slate-400">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Live 5-second cloud sync incoming feed</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Acuity levels 1 to 5 triage breakdown</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>En-route tracking & status progression</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between font-semibold text-sm text-emerald-400 group-hover:text-emerald-300">
+              <span>Go to Hospital Portal</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </button>
         </div>
-
-        {/* Informational Guidance Section */}
-        <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4 mt-8">
-          <h4 className="font-bold text-white text-base flex items-center gap-2">
-            <Stethoscope className="h-4 w-4 text-emerald-400" /> How Total Time is Calculated
-          </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs text-slate-400 leading-relaxed">
-            <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 space-y-1">
-              <strong className="text-slate-200 block text-sm">1. Travel Duration</strong>
-              Factored with real-time road conditions, traffic density, and construction delays along emergency routes.
-            </div>
-            <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 space-y-1">
-              <strong className="text-slate-200 block text-sm">2. ER Door-to-Doctor Queue</strong>
-              Estimated time from arrival at triage intake until examination by a licensed medical practitioner.
-            </div>
-            <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 space-y-1">
-              <strong className="text-slate-200 block text-sm">3. Clinical Appropriateness</strong>
-              Trauma, cardiac, and pediatric cases are automatically filtered to designated certified emergency departments.
-            </div>
-          </div>
-        </section>
       </main>
 
-      {/* Patient intake dialog -> inbound ticket */}
-      <Dialog open={!!ticketHospital} onOpenChange={(open) => !open && closeTicketForm()}>
-        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-h-[90vh] overflow-y-auto">
-          {ticketHospital && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="text-white">{ticketHospital.name}</DialogTitle>
-                <DialogDescription className="text-slate-400">{ticketHospital.address}</DialogDescription>
-              </DialogHeader>
-
-              {/* Calculated wait time */}
-              <div className="grid grid-cols-3 gap-2 bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-center">
-                <div>
-                  <span className="text-[11px] text-slate-400 block">Drive</span>
-                  <span className="text-sm font-bold text-blue-400">{ticketHospital.driveTimeMin} min</span>
-                </div>
-                <div>
-                  <span className="text-[11px] text-slate-400 block">Estimated ER wait</span>
-                  <span className="text-sm font-bold text-amber-400">{ticketHospital.waitTimeMin} min</span>
-                </div>
-                <div>
-                  <span className="text-[11px] text-slate-400 block">Total to care</span>
-                  <span className="text-sm font-extrabold text-emerald-400">
-                    {ticketHospital.driveTimeMin + ticketHospital.waitTimeMin} min
-                  </span>
-                </div>
-              </div>
-
-              {ticketSent ? (
-                <div className="space-y-4">
-                  <div className="bg-emerald-950/40 border border-emerald-700/50 text-emerald-200 rounded-xl p-4 text-sm">
-                    <strong className="block text-emerald-300">Arrival notice sent</strong>
-                    {ticketHospital.name} has been told to expect a patient in about {ticketHospital.driveTimeMin}{" "}
-                    minutes. Only age, symptoms and severity were shared — no personal contact details.
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white"
-                      onClick={() =>
-                        window.open(
-                          `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
-                            ticketHospital.name + " " + ticketHospital.address
-                          )}`,
-                          "_blank"
-                        )
-                      }
-                    >
-                      <Navigation className="h-4 w-4 mr-1.5" /> Start Directions
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="bg-slate-950 border-slate-800 text-slate-200 hover:bg-slate-800"
-                      onClick={closeTicketForm}
-                    >
-                      Close
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <form onSubmit={handleTicketSubmit} className="space-y-3">
-                  <Input
-                    value={intake.name}
-                    onChange={(e) => setIntake({ ...intake, name: e.target.value })}
-                    placeholder="Patient name"
-                    className="bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500"
-                  />
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Input
-                      type="tel"
-                      value={intake.phone}
-                      onChange={(e) => setIntake({ ...intake, phone: e.target.value })}
-                      placeholder="Phone number"
-                      className="bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500"
-                    />
-                    <Input
-                      type="email"
-                      value={intake.email}
-                      onChange={(e) => setIntake({ ...intake, email: e.target.value })}
-                      placeholder="Email"
-                      className="bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500"
-                    />
-                  </div>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={130}
-                    value={intake.age}
-                    onChange={(e) => setIntake({ ...intake, age: e.target.value })}
-                    placeholder="Age"
-                    className="bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500"
-                  />
-                  <textarea
-                    value={intake.symptoms}
-                    onChange={(e) => setIntake({ ...intake, symptoms: e.target.value })}
-                    placeholder="Describe your symptoms"
-                    rows={3}
-                    className="w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-
-                  <div className="space-y-1.5">
-                    <span className="text-xs font-medium text-slate-300">How severe are your symptoms?</span>
-                    <div className="grid grid-cols-5 gap-1.5">
-                      {SEVERITY_LEVELS.map((level) => (
-                        <button
-                          key={level.value}
-                          type="button"
-                          onClick={() => setIntake({ ...intake, severity: level.value })}
-                          className={`rounded-md border px-1 py-2 text-[11px] font-medium transition ${intake.severity === level.value
-                            ? level.value >= 4
-                              ? "bg-rose-600 border-rose-500 text-white"
-                              : "bg-indigo-600 border-indigo-500 text-white"
-                            : "bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800"
-                            }`}
-                        >
-                          {level.label}
-                        </button>
-                      ))}
-                    </div>
-                    {intake.severity === 5 && (
-                      <p className="text-xs text-rose-300">
-                        Critical? Call 911 instead of driving.
-                      </p>
-                    )}
-                  </div>
-
-                  <p className="text-[11px] text-slate-500">
-                    Your name, phone and email stay private and are not shared with the hospital. Only your age,
-                    symptoms, severity and arrival time are sent so they can plan for incoming traffic.
-                  </p>
-
-                  {ticketError && <p className="text-xs text-rose-300">{ticketError}</p>}
-
-                  <Button
-                    type="submit"
-                    disabled={ticketSubmitting}
-                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
-                  >
-                    {ticketSubmitting ? "Sending…" : "Notify hospital I'm coming"}
-                  </Button>
-                </form>
-              )}
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
       {/* Footer */}
-      <footer className="border-t border-slate-800/80 bg-slate-950 py-8 mt-12 text-center text-xs text-slate-400 space-y-2">
-        <div className="flex justify-center mb-2">
-          <SynapticLogo className="h-8 w-auto opacity-90 text-white" />
-        </div>
-        <p className="font-medium text-slate-300">Synaptic — Intelligent Emergency Hospital Guidance System</p>
-        <p className="text-slate-500">Calculates travel time and real-time ER triage waiting queues.</p>
-        <p className="text-rose-400 font-semibold pt-1">
-          For critical life-threatening emergencies requiring immediate resuscitation, always dial 911 directly.
-        </p>
+      <footer className="border-t border-slate-800/80 bg-slate-950 py-4 px-6 text-center text-xs text-slate-500">
+        Synaptic Healthcare Routing · Regional Emergency Access System
       </footer>
     </div>
   );
