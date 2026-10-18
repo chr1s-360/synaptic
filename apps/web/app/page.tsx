@@ -7,6 +7,7 @@ import { Button } from "@ui/components/ui/button";
 import { Input } from "@ui/components/ui/input";
 import { SynapticLogo } from "./logo";
 import InteractiveMap, { FacilityMarker } from "./map";
+import { geocodeCanadianAddress } from "./routing-engine";
 import {
   Clock,
   Car,
@@ -156,12 +157,62 @@ export default function Page() {
       block: "start",
     });
   };
-  const [userLocation, setUserLocation] = useState("Toronto, ON (detected)");
+  const [userLocation, setUserLocation] = useState("Toronto, ON (default)");
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number; label: string }>({
     lat: 43.6532,
     lng: -79.3832,
-    label: "Current Location (Toronto City Hall)",
+    label: "Default Location (Toronto City Hall)",
   });
+  // Routing waits until the browser location prompt has been answered
+  const [locationStatus, setLocationStatus] = useState<"pending" | "granted" | "denied" | "manual">("pending");
+  const [addressInput, setAddressInput] = useState("");
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
+
+  const handleManualLocation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = addressInput.trim();
+    if (!query) return;
+
+    setIsGeocoding(true);
+    setGeocodeError(null);
+    try {
+      const geo = await geocodeCanadianAddress(query);
+      const label = geo.displayName.split(",").slice(0, 3).join(",").trim();
+      setUserCoords({ lat: geo.lat, lng: geo.lng, label });
+      setUserLocation(label);
+      setLocationStatus("manual");
+    } catch (err: any) {
+      setGeocodeError(err?.message || "Could not find that location");
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  const requestLocation = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocationStatus("denied");
+      return;
+    }
+    setLocationStatus("pending");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserCoords({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          label: "Your Current Location",
+        });
+        setUserLocation("Your current location");
+        setLocationStatus("granted");
+      },
+      () => setLocationStatus("denied"),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  };
+
+  useEffect(() => {
+    requestLocation();
+  }, []);
 
   const [hospitals, setHospitals] = useState<HospitalItem[]>(SAMPLE_HOSPITALS);
   const [selectedHospitalId, setSelectedHospitalId] = useState<string>("3");
@@ -184,6 +235,9 @@ export default function Page() {
 
   // Fetch real facilities from the healthcare dataset via router parameters
   useEffect(() => {
+    // Don't route until the user has answered the location prompt
+    if (locationStatus === "pending") return;
+
     let ignore = false;
     async function fetchFacilities() {
       setLoading(true);
@@ -221,7 +275,7 @@ export default function Page() {
       ignore = true;
       clearTimeout(timer);
     };
-  }, [searchQuery, severityFilter, sortBy, userCoords.lat, userCoords.lng]);
+  }, [searchQuery, severityFilter, sortBy, userCoords.lat, userCoords.lng, locationStatus]);
 
   const bestChoice = hospitals[0];
 
@@ -399,6 +453,49 @@ export default function Page() {
 
       {/* Main Content Area */}
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
+        {/* Location status & manual entry */}
+        <div className="bg-amber-950/40 border border-amber-700/50 text-amber-200 rounded-xl px-4 py-3 text-xs sm:text-sm space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <span className="flex items-center gap-2">
+              <Compass className="h-4 w-4 shrink-0 text-amber-400" />
+              {locationStatus === "pending"
+                ? "Waiting for your location permission — or enter your location below."
+                : locationStatus === "denied"
+                  ? `Location unavailable — routing from ${userLocation}. Enter your location below for accurate travel times.`
+                  : `Routing from ${userLocation}`}
+            </span>
+            {locationStatus !== "granted" && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={requestLocation}
+                className="text-xs bg-slate-900 border-amber-700/60 text-amber-200 hover:bg-slate-800"
+              >
+                Use my location
+              </Button>
+            )}
+          </div>
+
+          <form onSubmit={handleManualLocation} className="flex flex-col sm:flex-row gap-2">
+            <Input
+              value={addressInput}
+              onChange={(e) => setAddressInput(e.target.value)}
+              placeholder="Enter an address, city or postal code (e.g. 100 Queen St W, Toronto)"
+              className="h-9 text-xs bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500"
+            />
+            <Button
+              type="submit"
+              size="sm"
+              disabled={isGeocoding || !addressInput.trim()}
+              className="h-9 text-xs bg-indigo-600 hover:bg-indigo-500 text-white"
+            >
+              {isGeocoding ? "Locating…" : "Set location"}
+            </Button>
+          </form>
+          {geocodeError && <p className="text-rose-300 text-xs">{geocodeError}</p>}
+        </div>
+
         {/* Recommended Best Option Spotlight Banner */}
         {bestChoice && (
           <div
