@@ -199,8 +199,26 @@ export async function GET(request: Request) {
     const sortBy = searchParams.get("sortBy") || "totalTime";
     const limit = Math.min(parseInt(searchParams.get("limit") || "80", 10), 300);
 
+    const latParam = searchParams.get("lat");
+    const lngParam = searchParams.get("lng");
+    const userLat = latParam ? parseFloat(latParam) : null;
+    const userLng = lngParam ? parseFloat(lngParam) : null;
+    const hasUserCoords = userLat !== null && userLng !== null && !isNaN(userLat) && !isNaN(userLng);
+
     const all = loadAllFacilities();
-    let matched = all;
+    let matched = all.map((f) => {
+      if (!hasUserCoords) return f;
+      const distKm = haversineKm(userLat, userLng, f.lat, f.lng);
+      const distMiles = Math.round(distKm * 0.621371 * 10) / 10;
+      const driveTime = Math.max(3, Math.round(distMiles * 2.1 + 3));
+      return {
+        ...f,
+        distanceKm: Math.round(distKm * 10) / 10,
+        distanceMiles: distMiles,
+        driveTimeMin: driveTime,
+        totalTimeMin: driveTime + f.waitTimeMin,
+      };
+    });
 
     // Filter strictly for healthcare facilities matching query
     if (query) {

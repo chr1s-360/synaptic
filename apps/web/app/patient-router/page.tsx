@@ -156,8 +156,21 @@ export default function Page() {
   const mapSectionRef = useRef<HTMLElement | null>(null);
   const resultsBannerRef = useRef<HTMLDivElement | null>(null);
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
+  const handleSearchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const query = searchQuery.trim();
+    if (query) {
+      // If the user typed an address or postal code into the main search, check if it's a location to route from
+      try {
+        const geo = await geocodeCanadianAddress(query);
+        const label = geo.displayName.split(",").slice(0, 3).join(",").trim();
+        setUserCoords({ lat: geo.lat, lng: geo.lng, label });
+        setUserLocation(label);
+        setLocationStatus("manual");
+      } catch {
+        // Not a geocodable address, normal text filter applies
+      }
+    }
     // Scroll to the recommended-hospital banner so the full hospital text and the map below are visible
     (resultsBannerRef.current ?? mapSectionRef.current)?.scrollIntoView({
       behavior: "smooth",

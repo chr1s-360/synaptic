@@ -252,12 +252,8 @@ export default function InteractiveMap({
             const viewKey = `${facilities.map((f) => f.id).join(",")}|${selectedFacilityId}|${userLocation.lat},${userLocation.lng}`;
             if (viewKey !== lastViewKeyRef.current) {
                 lastViewKeyRef.current = viewKey;
-                if (selectedFacility) {
-                    // Center the selected (searched) hospital on the map
-                    map.setView([selectedFacility.lat, selectedFacility.lng], 14, { animate: true });
-                } else {
-                    map.fitBounds(bounds, { padding: [35, 35], maxZoom: 14 });
-                }
+                // If user location changed or is present, fit bounds containing user and facilities
+                map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
             }
         }
     }, [facilities, userLocation, selectedFacilityId, mapLoaded, activeModeLabel, onSelectFacility]);
