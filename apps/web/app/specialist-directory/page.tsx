@@ -244,6 +244,12 @@ export default function Page() {
               <span className="text-xs text-indigo-400 font-semibold block leading-tight">
                 Specialist Directory
               </span>
+              <Link
+                href="/hospital-portal"
+                className="text-xs text-slate-400 font-medium block leading-tight hover:text-slate-200 transition-colors"
+              >
+                Hospital Portal
+              </Link>
             </div>
           </div>
           <div className="flex items-center gap-3">

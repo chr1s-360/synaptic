@@ -393,7 +393,7 @@ export default function Page() {
               </Link>
               <Link
                 href="/hospital-portal"
-                className="text-xs text-indigo-400 font-medium block leading-tight hover:text-indigo-300 transition-colors"
+                className="text-xs text-slate-400 font-medium block leading-tight hover:text-slate-200 transition-colors"
               >
                 Hospital Portal
               </Link>
@@ -456,32 +456,6 @@ export default function Page() {
                 <span className="text-slate-400 font-medium flex items-center gap-1 mr-1">
                   <SlidersHorizontal className="h-3 w-3" /> Filters:
                 </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSeverityFilter("all");
-                    updateRoute(searchQuery, "all", sortBy);
-                  }}
-                  className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "all"
-                    ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
-                    : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
-                    }`}
-                >
-                  All Facilities
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSeverityFilter("hospital");
-                    updateRoute(searchQuery, "hospital", sortBy);
-                  }}
-                  className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "hospital"
-                    ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
-                    : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
-                    }`}
-                >
-                  Hospitals Only
-                </button>
                 <button
                   type="button"
                   onClick={() => {
