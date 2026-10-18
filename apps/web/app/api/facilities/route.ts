@@ -1,251 +1,259 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-import { ONTARIO_FACILITIES, HealthFacility } from "../../facilities-data";
 
-export const dynamic = "force-dynamic";
-
-export interface HospitalItem {
-    id: string;
-    name: string;
-    address: string;
-    phone: string;
-    distanceMiles: number;
-    driveTimeMin: number;
-    waitTimeMin: number;
-    erLevel: string;
-    rating: number;
-    availableBeds: number;
-    specialties: string[];
-    lat: number;
-    lng: number;
+export interface HealthcareFacility {
+  id: string;
+  name: string;
+  serviceType: string;
+  serviceTypeDetail?: string;
+  community: string;
+  postalCode: string;
+  address: string;
+  phone: string;
+  lat: number;
+  lng: number;
+  distanceKm: number;
+  distanceMiles: number;
+  driveTimeMin: number;
+  waitTimeMin: number;
+  totalTimeMin: number;
+  erLevel: string;
+  rating: number;
+  availableBeds: number;
+  specialties: string[];
 }
 
-let cachedFacilities: HospitalItem[] | null = null;
+const DEFAULT_ORIGIN = { lat: 43.6532, lng: -79.3832 }; // Toronto City Hall
 
-function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const R = 3958.8; // miles
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return Math.round(R * c * 10) / 10;
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const radius = 6371.0088;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return radius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function parseCSVLine(line: string): string[] {
-    const result: string[] = [];
-    let current = "";
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        if (char === '"' || char === "'") {
-            inQuotes = !inQuotes;
-        } else if (char === "," && !inQuotes) {
-            result.push(current.trim());
-            current = "";
-        } else {
-            current += char;
-        }
+// In-memory cache for parsed CSV data
+let cachedFacilities: HealthcareFacility[] | null = null;
+
+function parseCsvLine(text: string): string[] {
+  const result: string[] = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"') {
+      if (inQuotes && text[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === "," && !inQuotes) {
+      result.push(cur.trim());
+      cur = "";
+    } else {
+      cur += ch;
     }
-    result.push(current.trim());
-    return result;
+  }
+  result.push(cur.trim());
+  return result;
 }
 
-function loadDataset(): HospitalItem[] {
-    if (cachedFacilities) return cachedFacilities;
-
-    // 1. Try reading the services/map-service/health_location.csv or data folder
-    const candidatePaths = [
-        path.join(process.cwd(), "services", "map-service", "health_location.csv"),
-        path.join(process.cwd(), "..", "..", "services", "map-service", "health_location.csv"),
-        path.join(process.cwd(), "data", "Ontario_Health_Facilities.csv"),
-        path.join(process.cwd(), "..", "..", "data", "Ontario_Health_Facilities.csv"),
-    ];
-
-    let rawData = "";
-    for (const p of candidatePaths) {
-        if (fs.existsSync(p)) {
-            try {
-                rawData = fs.readFileSync(p, "utf-8");
-                break;
-            } catch (e) {
-                console.warn("Could not read file at", p, e);
-            }
-        }
-    }
-
-    const items: HospitalItem[] = [];
-
-    if (rawData) {
-        const lines = rawData.split(/\r?\n/).filter((l) => l.trim().length > 0);
-        if (lines.length > 1) {
-            const header = parseCSVLine(lines[0]!.toLowerCase());
-            const nameIdx = header.findIndex((h) => h.includes("name") || h.includes("english_name"));
-            const typeIdx = header.findIndex((h) => h.includes("service_type") || h.includes("type"));
-            const commIdx = header.findIndex((h) => h.includes("community") || h.includes("city"));
-            const postalIdx = header.findIndex((h) => h.includes("postal"));
-            const xIdx = header.findIndex((h) => h === "x" || h.includes("long") || h.includes("lon"));
-            const yIdx = header.findIndex((h) => h === "y" || h.includes("lat"));
-
-            for (let i = 1; i < lines.length; i++) {
-                const cols = parseCSVLine(lines[i]!);
-                const name = nameIdx !== -1 && cols[nameIdx] ? cols[nameIdx] : "";
-                const lat = yIdx !== -1 ? parseFloat(cols[yIdx] || "0") : 0;
-                const lng = xIdx !== -1 ? parseFloat(cols[xIdx] || "0") : 0;
-
-                if (!name || isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) continue;
-
-                const comm = commIdx !== -1 ? cols[commIdx] : "";
-                const postal = postalIdx !== -1 ? cols[postalIdx] : "";
-                const serviceType = typeIdx !== -1 ? cols[typeIdx] : "Hospital";
-
-                // Check matching facility from ONTARIO_FACILITIES for rich metadata if available
-                const matched = ONTARIO_FACILITIES.find(
-                    (f) => f.name.toLowerCase() === name.toLowerCase() || f.name.toLowerCase().includes(name.toLowerCase())
-                );
-
-                const address = matched ? `${matched.community}, ON ${matched.postalCode}` : `${comm || "Toronto"}, ON ${postal}`.trim();
-                const phone = matched?.phone || "(416) 555-0100";
-                const erLevel = matched?.erLevel || (name.toLowerCase().includes("sickkids") || name.toLowerCase().includes("pediatric")
-                    ? "Level 1 Pediatric Trauma"
-                    : serviceType.toLowerCase().includes("trauma") || /general|st\. michael|sunnybrook/i.test(name)
-                        ? "Level 1 Trauma"
-                        : "Community Emergency");
-                const waitTimeMin = matched?.waitTimeMin ?? Math.max(12, ((name.length * 7 + i * 5) % 38) + 12);
-                const availableBeds = matched?.availableBeds ?? Math.max(4, ((name.length * 3 + i * 4) % 20) + 6);
-                const specialties = matched?.specialties || [
-                    serviceType,
-                    /trauma/i.test(erLevel) ? "Trauma" : "General ER",
-                    /pediatric/i.test(name) ? "Pediatrics" : "Emergency Care",
-                ];
-
-                items.push({
-                    id: matched?.id || `csv-${i}`,
-                    name,
-                    address,
-                    phone,
-                    distanceMiles: 0,
-                    driveTimeMin: 0,
-                    waitTimeMin,
-                    erLevel,
-                    rating: matched ? 4.7 : 4.4,
-                    availableBeds,
-                    specialties,
-                    lat,
-                    lng,
-                });
-            }
-        }
-    }
-
-    // Fallback to ONTARIO_FACILITIES if CSV was missing or empty
-    if (items.length === 0) {
-        ONTARIO_FACILITIES.forEach((fac) => {
-            items.push({
-                id: fac.id,
-                name: fac.name,
-                address: `${fac.community}, ON ${fac.postalCode}`,
-                phone: fac.phone,
-                distanceMiles: 0,
-                driveTimeMin: 0,
-                waitTimeMin: fac.waitTimeMin,
-                erLevel: fac.erLevel,
-                rating: 4.8,
-                availableBeds: fac.availableBeds,
-                specialties: fac.specialties,
-                lat: fac.lat,
-                lng: fac.lng,
-            });
-        });
-    }
-
-    cachedFacilities = items;
+function loadAllFacilities(): HealthcareFacility[] {
+  if (cachedFacilities && cachedFacilities.length > 0) {
     return cachedFacilities;
+  }
+
+  const candidatePaths = [
+    path.join(process.cwd(), "public", "healthcare_facility.csv"),
+    path.join(process.cwd(), "apps", "web", "public", "healthcare_facility.csv"),
+    path.join(process.cwd(), "apps", "web", "app", "healthcare_facility.csv"),
+    path.join(process.cwd(), "healthcare_facility.csv"),
+    "/Users/sonakshibilas/Desktop/Synaptic-HTV 11/synaptic/apps/web/app/healthcare_facility.csv",
+  ];
+
+  let csvContent = "";
+  for (const p of candidatePaths) {
+    if (fs.existsSync(p)) {
+      csvContent = fs.readFileSync(p, "utf-8");
+      break;
+    }
+  }
+
+  if (!csvContent) {
+    console.warn("Could not find healthcare_facility.csv");
+    return [];
+  }
+
+  const lines = csvContent.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length < 2) return [];
+
+  const header = parseCsvLine(lines[0]);
+  const lonIdx = header.indexOf("X");
+  const latIdx = header.indexOf("Y");
+  const typeIdx = header.indexOf("SERVICE_TYPE");
+  const detailIdx = header.indexOf("SERVICE_TYPE_DETAIL");
+  const nameIdx = header.indexOf("ENGLISH_NAME");
+  const addr1Idx = header.indexOf("ADDRESS_LINE_1");
+  const commIdx = header.indexOf("COMMUNITY");
+  const postalIdx = header.indexOf("POSTAL_CODE");
+
+  const facilities: HealthcareFacility[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCsvLine(lines[i]);
+    if (cols.length < 6) continue;
+
+    const lng = parseFloat(cols[lonIdx]);
+    const lat = parseFloat(cols[latIdx]);
+    if (isNaN(lat) || isNaN(lng) || lat < 40 || lat > 85) continue;
+
+    const name = cols[nameIdx] || "Healthcare Facility";
+    const serviceType = cols[typeIdx] || "Healthcare Facility";
+    const serviceTypeDetail = detailIdx !== -1 ? cols[detailIdx] : "";
+    const addr1 = addr1Idx !== -1 ? cols[addr1Idx] : "";
+    const community = commIdx !== -1 ? cols[commIdx] : "Ontario";
+    const postalCode = postalIdx !== -1 ? cols[postalIdx] : "";
+
+    const fullAddress = [addr1, community, "ON", postalCode].filter(Boolean).join(", ");
+
+    const distKm = haversineKm(DEFAULT_ORIGIN.lat, DEFAULT_ORIGIN.lng, lat, lng);
+    const distMiles = Math.round(distKm * 0.621371 * 10) / 10;
+    const driveTime = Math.max(3, Math.round(distMiles * 2.1 + 3));
+
+    // Categorization & clinical attributes
+    let waitTime = 15;
+    let erLevel = "Community Health";
+    const lowerType = serviceType.toLowerCase();
+    const lowerName = name.toLowerCase();
+
+    if (lowerType.includes("hospital") || lowerName.includes("hospital")) {
+      if (lowerType.includes("trauma") || lowerName.includes("general") || lowerName.includes("sunnybrook") || lowerName.includes("michael")) {
+        erLevel = "Level 1 Trauma";
+        waitTime = 16 + (i % 12);
+      } else if (lowerType.includes("pediatric") || lowerName.includes("sickkids") || lowerName.includes("children")) {
+        erLevel = "Pediatric Hospital";
+        waitTime = 20 + (i % 8);
+      } else {
+        erLevel = "Level 2 Trauma";
+        waitTime = 22 + (i % 20);
+      }
+    } else if (lowerType.includes("community health") || lowerType.includes("clinic")) {
+      erLevel = "Community Health Centre";
+      waitTime = 12 + (i % 15);
+    } else if (lowerType.includes("pharmacy")) {
+      erLevel = "Pharmacy";
+      waitTime = 5 + (i % 5);
+    } else if (lowerType.includes("lab")) {
+      erLevel = "Diagnostic Lab";
+      waitTime = 10 + (i % 10);
+    }
+
+    const rating = Math.round((4.0 + ((i % 10) / 10) * 0.9) * 10) / 10;
+    const availableBeds = erLevel.includes("Trauma") || erLevel.includes("Hospital") ? 8 + (i % 20) : 0;
+
+    const specialties: string[] = [serviceType];
+    if (serviceTypeDetail) specialties.push(serviceTypeDetail);
+    if (erLevel.includes("Trauma")) specialties.push("Emergency Triage", "Acute Care");
+    if (erLevel.includes("Pediatric")) specialties.push("Pediatrics", "Child Emergency");
+
+    facilities.push({
+      id: String(i),
+      name,
+      serviceType,
+      serviceTypeDetail,
+      community,
+      postalCode,
+      address: fullAddress,
+      phone: "(416) 555-" + String(1000 + (i % 9000)),
+      lat,
+      lng,
+      distanceKm: Math.round(distKm * 10) / 10,
+      distanceMiles: distMiles,
+      driveTimeMin: driveTime,
+      waitTimeMin: waitTime,
+      totalTimeMin: driveTime + waitTime,
+      erLevel,
+      rating,
+      availableBeds,
+      specialties: Array.from(new Set(specialties)),
+    });
+  }
+
+  cachedFacilities = facilities;
+  return facilities;
 }
 
-export async function GET(req: Request) {
-    try {
-        const { searchParams } = new URL(req.url);
-        const query = (searchParams.get("query") || "").toLowerCase().trim();
-        const filter = (searchParams.get("filter") || "all").toLowerCase();
-        const sortBy = searchParams.get("sortBy") || "totalTime";
-        const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "100", 10), 1), 200);
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const query = searchParams.get("query")?.toLowerCase().trim() || "";
+    const filter = searchParams.get("filter") || "all";
+    const sortBy = searchParams.get("sortBy") || "totalTime";
+    const limit = Math.min(parseInt(searchParams.get("limit") || "80", 10), 300);
 
-        const userLat = parseFloat(searchParams.get("lat") || "43.6532");
-        const userLng = parseFloat(searchParams.get("lng") || "-79.3832");
+    const all = loadAllFacilities();
+    let matched = all;
 
-        const dataset = loadDataset();
-
-        // Calculate real distance & traffic-adjusted driving estimate
-        let list = dataset.map((fac) => {
-            const distance = haversineMiles(userLat, userLng, fac.lat, fac.lng);
-            // Rough urban driving estimate: ~2.2 mins per mile + 3 min baseline buffer
-            const driveTime = Math.max(3, Math.round(distance * 2.2 + 3));
-            return {
-                ...fac,
-                distanceMiles: distance,
-                driveTimeMin: driveTime,
-            };
-        });
-
-        // 1. Text Search Filter (name, address, community, specialty, erLevel)
-        if (query) {
-            list = list.filter((fac) => {
-                return (
-                    fac.name.toLowerCase().includes(query) ||
-                    fac.address.toLowerCase().includes(query) ||
-                    fac.erLevel.toLowerCase().includes(query) ||
-                    fac.specialties.some((s) => s.toLowerCase().includes(query))
-                );
-            });
-        }
-
-        // 2. Category / Severity Filter
-        if (filter === "level1") {
-            list = list.filter((f) => f.erLevel.toLowerCase().includes("level 1"));
-        } else if (filter === "pediatric") {
-            list = list.filter(
-                (f) =>
-                    f.name.toLowerCase().includes("child") ||
-                    f.name.toLowerCase().includes("pediatric") ||
-                    f.erLevel.toLowerCase().includes("pediatric") ||
-                    f.specialties.some((s) => s.toLowerCase().includes("pediatric"))
-            );
-        } else if (filter === "hospital") {
-            list = list.filter((f) => /hospital|health sciences|general|centre|clinic/i.test(f.name));
-        }
-
-        // 3. Sorting
-        list.sort((a, b) => {
-            if (sortBy === "waitTime") {
-                return a.waitTimeMin - b.waitTimeMin;
-            }
-            if (sortBy === "driveTime") {
-                return a.driveTimeMin - b.driveTimeMin;
-            }
-            if (sortBy === "distance") {
-                return a.distanceMiles - b.distanceMiles;
-            }
-            // Default: totalTime (drive + wait)
-            const totalA = a.driveTimeMin + a.waitTimeMin;
-            const totalB = b.driveTimeMin + b.waitTimeMin;
-            return totalA - totalB;
-        });
-
-        return NextResponse.json({
-            facilities: list.slice(0, limit),
-            totalCount: list.length,
-        });
-    } catch (error: any) {
-        console.error("Facilities API error:", error);
-        return NextResponse.json(
-            { error: "Failed to load facilities", details: error?.message },
-            { status: 500 }
-        );
+    // Filter strictly for healthcare facilities matching query
+    if (query) {
+      matched = matched.filter(
+        (f) =>
+          f.name.toLowerCase().includes(query) ||
+          f.serviceType.toLowerCase().includes(query) ||
+          (f.serviceTypeDetail && f.serviceTypeDetail.toLowerCase().includes(query)) ||
+          f.community.toLowerCase().includes(query) ||
+          f.postalCode.toLowerCase().includes(query) ||
+          f.erLevel.toLowerCase().includes(query) ||
+          f.specialties.some((s) => s.toLowerCase().includes(query))
+      );
     }
+
+    // Filter buttons (all, level1, pediatric, hospital)
+    if (filter === "level1") {
+      matched = matched.filter((f) => f.erLevel === "Level 1 Trauma");
+    } else if (filter === "pediatric") {
+      matched = matched.filter(
+        (f) => f.erLevel === "Pediatric Hospital" || f.specialties.some((s) => s.toLowerCase().includes("pediatric") || s.toLowerCase().includes("child"))
+      );
+    } else if (filter === "hospital") {
+      matched = matched.filter(
+        (f) => f.serviceType.toLowerCase().includes("hospital") || f.erLevel.includes("Hospital") || f.erLevel.includes("Trauma")
+      );
+    }
+
+    // Sort order
+    if (sortBy === "totalTime") {
+      matched.sort((a, b) => a.totalTimeMin - b.totalTimeMin);
+    } else if (sortBy === "waitTime") {
+      matched.sort((a, b) => a.waitTimeMin - b.waitTimeMin);
+    } else if (sortBy === "driveTime") {
+      matched.sort((a, b) => a.driveTimeMin - b.driveTimeMin);
+    } else if (sortBy === "distance") {
+      matched.sort((a, b) => a.distanceMiles - b.distanceMiles);
+    }
+
+    const paged = matched.slice(0, limit);
+
+    return NextResponse.json({
+      success: true,
+      totalCount: matched.length,
+      returnedCount: paged.length,
+      query,
+      filter,
+      sortBy,
+      facilities: paged,
+    });
+  } catch (error: any) {
+    console.error("Healthcare facility search failed:", error);
+    return NextResponse.json(
+      { error: "Search failed", details: error?.message },
+      { status: 500 }
+    );
+  }
 }

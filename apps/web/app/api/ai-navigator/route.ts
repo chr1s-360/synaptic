@@ -271,7 +271,7 @@ function cleanOutputText(text: string): string {
         .trim();
 }
 
-// Optional Gemini API call when GEMINI_API_KEY is configured
+// Gemini API call using user's configured Gemini API key
 async function queryGemini(
     prompt: string,
     priorContext: string,
@@ -317,30 +317,46 @@ Respond in valid JSON only with this structure:
   ]
 }`;
 
-        const res = await fetch(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-goog-api-key": apiKey,
-                },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: systemPrompt }] }],
-                    generationConfig: {
-                        temperature: 0.3,
-                        responseMimeType: "application/json",
-                    },
-                }),
-            }
-        );
+        const candidateModels = [
+            "gemini-flash-lite-latest",
+            "gemini-3.5-flash-lite",
+            "gemini-3.8-flash",
+            "gemini-flash-latest",
+        ];
 
-        if (!res.ok) {
-            console.warn("Gemini HTTP error status:", res.status);
-            return null;
+        let rawText: string | null = null;
+        for (const model of candidateModels) {
+            try {
+                const res = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: systemPrompt }] }],
+                            generationConfig: {
+                                temperature: 0.25,
+                                responseMimeType: "application/json",
+                            },
+                        }),
+                    }
+                );
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (text) {
+                        rawText = text;
+                        break;
+                    }
+                }
+            } catch (fetchErr) {
+                // try next candidate model
+            }
         }
-        const data = await res.json();
-        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
         if (!rawText) return null;
 
         const parsed = JSON.parse(rawText);
@@ -426,17 +442,36 @@ export async function POST(req: Request) {
             lower.includes("directory");
 
         let specialistContext: SpecialistInfo | null = null;
-        if (isSpecialistIntent || lower.includes("ear")) {
-            const specType = lower.includes("ear")
-                ? "Pediatric ENT (Ear, Nose & Throat) Specialist"
-                : "Board-Certified Medical Specialist";
+        if (isSpecialistIntent || (lower.includes("ear") && (lower.includes("doctor") || lower.includes("specialist") || lower.includes("hurt")))) {
+            let specType = "Board-Certified Medical Specialist";
+            let dirQuery = "all";
+
+            if (lower.includes("ear") || lower.includes("ent") || lower.includes("throat") || lower.includes("hearing")) {
+                specType = isPediatric
+                    ? "Dr. Evelyn Vance (MD, FRCSC) - Pediatric Otolaryngology (SickKids)"
+                    : "Dr. Jonathan Hayes (MD, FRCSC) - Adult Otolaryngology (Toronto General)";
+                dirQuery = "ent";
+            } else if (lower.includes("heart") || lower.includes("cardio")) {
+                specType = "Dr. Sarah Chen (MD, FRCPC) - Cardiology & Arrhythmia (St. Michael's)";
+                dirQuery = "cardiology";
+            } else if (lower.includes("skin") || lower.includes("rash") || lower.includes("derm")) {
+                specType = "Dr. Leila Ansari (MD, FRCPC) - Dermatology (Women's College Hospital)";
+                dirQuery = "dermatology";
+            } else if (lower.includes("bone") || lower.includes("joint") || lower.includes("orthoped")) {
+                specType = "Dr. David Miller (MD, FRCSC) - Orthopedic Surgery (Sunnybrook)";
+                dirQuery = "orthopedics";
+            } else if (lower.includes("headache") || lower.includes("migraine") || lower.includes("neurol")) {
+                specType = "Dr. Robert Thorne (MD, FRCPC) - Neurology (St. Michael's)";
+                dirQuery = "neurology";
+            }
+
             specialistContext = {
                 type: specType,
-                recommendedDirectoryUrl: "/specialist-directory",
+                recommendedDirectoryUrl: `/specialist-directory?search=${dirQuery}`,
                 nextSteps: [
-                    `Browse verified physicians in our Synaptic Specialist Directory`,
-                    `Request a clinical referral letter/fax confirmation from your referring doctor`,
-                    `If pain or fever spikes before your appointment, visit ${isPediatric ? "SickKids Emergency" : "Downtown Urgent Care Clinic"} for immediate ear drops or evaluation`,
+                    `Review verified physician profiles in our specialist directory`,
+                    `Ask referring physician to send a direct clinical referral letter or fax`,
+                    `For severe discomfort or high fever prior to your consult, visit ${isPediatric ? "SickKids Emergency" : "Downtown Urgent Care Clinic"} for immediate interim care`,
                 ],
             };
         }
@@ -487,11 +522,14 @@ export async function POST(req: Request) {
 
             // Minor illness routing
             if (isMinor) {
-                if (fac.erLevel.includes("Walk-in") || fac.erLevel.includes("Community")) {
-                    score += 35;
-                    clinicalRationale = `Fastest care for non-emergent symptoms: avoids crowded ER triage queues (${liveWaitTime}m wait time).`;
+                if (fac.erLevel.includes("Walk-in") || fac.erLevel.includes("Urgent Care")) {
+                    score += 55;
+                    clinicalRationale = `Recommended for mild symptoms: Walk-in clinic and outpatient care with minimal wait time (${liveWaitTime}m), avoiding crowded hospital ER triage queues.`;
+                } else if (fac.erLevel.includes("Community")) {
+                    score += 25;
+                    clinicalRationale = `Fastest community care for non-emergent symptoms: avoids crowded tertiary ER triage queues (${liveWaitTime}m wait time).`;
                 } else {
-                    score -= 15;
+                    score -= 30;
                 }
             }
 
