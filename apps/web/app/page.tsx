@@ -4,6 +4,13 @@ import { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@ui/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@ui/components/ui/dropdown-menu";
 import { Input } from "@ui/components/ui/input";
 import { SynapticLogo } from "./logo";
 import InteractiveMap, { FacilityMarker } from "./map";
@@ -25,6 +32,7 @@ import {
   ExternalLink,
   Layers,
   Loader2,
+  ChevronDown,
 } from "lucide-react";
 
 interface HospitalItem {
@@ -42,6 +50,14 @@ interface HospitalItem {
   lat: number;
   lng: number;
 }
+
+const FACILITY_TYPE_OPTIONS = [
+  { value: "all", label: "Facility" },
+  { value: "hospital", label: "Hospital" },
+  { value: "pharmacy", label: "Pharmacy" },
+  { value: "walk-in clinic", label: "Walk-in" },
+  { value: "er", label: "ER" },
+] as const;
 
 const SAMPLE_HOSPITALS: HospitalItem[] = [
   {
@@ -155,7 +171,7 @@ export default function Page() {
   const [hospitals, setHospitals] = useState<HospitalItem[]>(SAMPLE_HOSPITALS);
   const [selectedHospitalId, setSelectedHospitalId] = useState<string>("3");
   const [sortBy, setSortBy] = useState<"totalTime" | "waitTime" | "driveTime">(urlSort);
-  const [severityFilter, setSeverityFilter] = useState<"all" | "level1" | "pediatric" | "hospital">(
+  const [severityFilter, setSeverityFilter] = useState<"all" | "level1" | "pediatric" | "hospital" | "pharmacy" | "walk-in clinic" | "er">(
     (urlFilter as any) || "all"
   );
   const [mapMode, setMapMode] = useState<"interactive" | "streamlit">("interactive");
@@ -302,32 +318,49 @@ export default function Page() {
                 <span className="text-slate-400 font-medium flex items-center gap-1 mr-1">
                   <SlidersHorizontal className="h-3 w-3" /> Filters:
                 </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSeverityFilter("all");
-                    updateRoute(searchQuery, "all", sortBy);
-                  }}
-                  className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "all"
-                    ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
-                    : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
-                    }`}
-                >
-                  All Facilities
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSeverityFilter("hospital");
-                    updateRoute(searchQuery, "hospital", sortBy);
-                  }}
-                  className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "hospital"
-                    ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
-                    : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
-                    }`}
-                >
-                  Hospitals Only
-                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-auto gap-1.5 rounded-md border-slate-800 bg-slate-950 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-slate-800 hover:text-white"
+                    >
+                      {FACILITY_TYPE_OPTIONS.find(
+                        (option) => option.value === severityFilter
+                      )?.label ?? "Facility Type"}
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuRadioGroup
+                      value={
+                        FACILITY_TYPE_OPTIONS.some(
+                          (option) => option.value === severityFilter
+                        )
+                          ? severityFilter
+                          : ""
+                      }
+                      onValueChange={(value) => {
+                        const selectedOption = FACILITY_TYPE_OPTIONS.find(
+                          (option) => option.value === value
+                        );
+                        if (selectedOption) {
+                          setSeverityFilter(selectedOption.value);
+                          updateRoute(searchQuery, selectedOption.value, sortBy);
+                        }
+                      }}
+                    >
+                      {FACILITY_TYPE_OPTIONS.map((option) => (
+                        <DropdownMenuRadioItem
+                          key={option.value}
+                          value={option.value}
+                        >
+                          {option.label}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <button
                   type="button"
                   onClick={() => {
