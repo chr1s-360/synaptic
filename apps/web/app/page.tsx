@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useRef, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@ui/components/ui/button";
@@ -145,6 +145,17 @@ export default function Page() {
   const urlSort = (searchParams.get("sortBy") as any) || "totalTime";
 
   const [searchQuery, setSearchQuery] = useState(urlQuery);
+  const mapSectionRef = useRef<HTMLElement | null>(null);
+  const resultsBannerRef = useRef<HTMLDivElement | null>(null);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Scroll to the recommended-hospital banner so the full hospital text and the map below are visible
+    (resultsBannerRef.current ?? mapSectionRef.current)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
   const [userLocation, setUserLocation] = useState("Toronto, ON (detected)");
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number; label: string }>({
     lat: 43.6532,
@@ -171,7 +182,7 @@ export default function Page() {
     router.replace(`/?${params.toString()}`);
   };
 
-  // Fetch real facilities from the 11,625-row healthcare CSV via router parameters
+  // Fetch real facilities from the healthcare dataset via router parameters
   useEffect(() => {
     let ignore = false;
     async function fetchFacilities() {
@@ -181,6 +192,8 @@ export default function Page() {
         if (searchQuery.trim()) params.set("query", searchQuery.trim());
         if (severityFilter !== "all") params.set("filter", severityFilter);
         params.set("sortBy", sortBy);
+        params.set("lat", userCoords.lat.toString());
+        params.set("lng", userCoords.lng.toString());
         params.set("limit", "100");
 
         const res = await fetch(`/api/facilities?${params.toString()}`);
@@ -194,7 +207,7 @@ export default function Page() {
           }
         }
       } catch (err) {
-        console.warn("Failed loading live CSV facilities, using fallback:", err);
+        console.warn("Failed loading live facilities, using fallback:", err);
       } finally {
         if (!ignore) setLoading(false);
       }
@@ -208,7 +221,7 @@ export default function Page() {
       ignore = true;
       clearTimeout(timer);
     };
-  }, [searchQuery, severityFilter, sortBy]);
+  }, [searchQuery, severityFilter, sortBy, userCoords.lat, userCoords.lng]);
 
   const bestChoice = hospitals[0];
 
@@ -280,7 +293,7 @@ export default function Page() {
 
           {/* Location & Quick Search Controls */}
           <div className="bg-slate-900/90 p-3 sm:p-4 rounded-2xl shadow-2xl border border-slate-800 max-w-2xl mx-auto mt-6 space-y-3 text-left backdrop-blur-xl">
-            <div className="flex flex-col sm:flex-row gap-2">
+            <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
                 <Input
@@ -294,7 +307,13 @@ export default function Page() {
                   className="pl-9 h-11 text-sm bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:ring-indigo-500"
                 />
               </div>
-            </div>
+              <Button
+                type="submit"
+                className="h-11 px-5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold"
+              >
+                Search
+              </Button>
+            </form>
 
             {/* Filter pills & sort selectors */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs">
@@ -382,7 +401,10 @@ export default function Page() {
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
         {/* Recommended Best Option Spotlight Banner */}
         {bestChoice && (
-          <div className="bg-gradient-to-r from-emerald-950/40 via-slate-900 to-indigo-950/40 border border-emerald-500/40 rounded-2xl p-5 sm:p-6 shadow-xl backdrop-blur-md">
+          <div
+            ref={resultsBannerRef}
+            className="scroll-mt-20 bg-gradient-to-r from-emerald-950/40 via-slate-900 to-indigo-950/40 border border-emerald-500/40 rounded-2xl p-5 sm:p-6 shadow-xl backdrop-blur-md"
+          >
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div className="space-y-1">
                 <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-300 bg-emerald-950/80 border border-emerald-700/60 px-2.5 py-0.5 rounded-full">
@@ -438,7 +460,10 @@ export default function Page() {
         )}
 
         {/* Interactive Accessibility Map Container */}
-        <section className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
+        <section
+          ref={mapSectionRef}
+          className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl overflow-hidden scroll-mt-20"
+        >
           <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950/70">
             <div className="flex items-center gap-2.5">
               <div className="h-9 w-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-sm">

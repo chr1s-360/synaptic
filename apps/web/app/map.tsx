@@ -38,6 +38,7 @@ export default function InteractiveMap({
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<any>(null);
     const markersRef = useRef<any[]>([]);
+    const lastViewKeyRef = useRef<string>("");
     const [mapLoaded, setMapLoaded] = useState(false);
 
     // Dynamically load Leaflet styles and script on client only
@@ -101,7 +102,9 @@ export default function InteractiveMap({
                 mapInstanceRef.current = null;
             }
         };
-    }, [facilities, selectedFacilityId, userLocation.lat, userLocation.lng]);
+        // Initialise the Leaflet map once; markers/view are handled by the effect below
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Update markers and bounds when facilities, userLocation, or selection changes
     useEffect(() => {
@@ -113,6 +116,7 @@ export default function InteractiveMap({
         markersRef.current.forEach((m) => m.remove());
         markersRef.current = [];
 
+        const selectedFacility = facilities.find((f) => f.id === selectedFacilityId);
         const bounds = L.latLngBounds([
             [userLocation.lat, userLocation.lng],
         ]);
@@ -244,7 +248,17 @@ export default function InteractiveMap({
         });
 
         if (facilities.length > 0) {
-            map.fitBounds(bounds, { padding: [35, 35], maxZoom: 14 });
+            // Re-frame only when the result set / selection / origin actually changes
+            const viewKey = `${facilities.map((f) => f.id).join(",")}|${selectedFacilityId}|${userLocation.lat},${userLocation.lng}`;
+            if (viewKey !== lastViewKeyRef.current) {
+                lastViewKeyRef.current = viewKey;
+                if (selectedFacility) {
+                    // Center the selected (searched) hospital on the map
+                    map.setView([selectedFacility.lat, selectedFacility.lng], 14, { animate: true });
+                } else {
+                    map.fitBounds(bounds, { padding: [35, 35], maxZoom: 14 });
+                }
+            }
         }
     }, [facilities, userLocation, selectedFacilityId, mapLoaded, activeModeLabel, onSelectFacility]);
 
