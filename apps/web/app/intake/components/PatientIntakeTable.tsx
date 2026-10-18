@@ -102,19 +102,17 @@ export function PatientIntakeTable({
                 return (
                   <tr
                     key={r.id}
-                    className={`hover:bg-slate-50/80 transition cursor-pointer ${
-                      r.needsStaffReview ? "bg-rose-50/30" : ""
-                    }`}
+                    className={`hover:bg-slate-50/80 transition cursor-pointer ${r.needsStaffReview ? "bg-rose-50/30" : ""
+                      }`}
                     onClick={() => onSelectPatient(r)}
                   >
                     {/* Patient ID */}
                     <td className="py-3 px-3.5 font-mono font-bold text-blue-700">
                       <div className="flex items-center gap-1.5">
                         {r.needsStaffReview && (
-                          <AlertCircle
-                            className="w-3.5 h-3.5 text-rose-500 shrink-0"
-                            title="Flagged for staff review"
-                          />
+                          <span title="Flagged for staff review" className="inline-flex items-center">
+                            <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                          </span>
                         )}
                         <span>{r.id}</span>
                       </div>

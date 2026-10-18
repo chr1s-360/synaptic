@@ -172,8 +172,8 @@ export default function AiHealthcareNavigator() {
         ]);
     };
 
-    // Hide the AI triage chatbot on hospital staff pages
-    if (pathname?.startsWith("/hospital-portal")) {
+    // Hide the AI triage chatbot on role selector and hospital staff pages
+    if (pathname === "/" || pathname?.startsWith("/hospital-portal")) {
         return null;
     }
 

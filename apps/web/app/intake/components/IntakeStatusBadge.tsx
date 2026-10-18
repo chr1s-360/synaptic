@@ -1,5 +1,5 @@
 import React from "react";
-import { IntakeStatus } from "./types";
+import { IntakeStatus } from "../types";
 
 interface IntakeStatusBadgeProps {
   status: IntakeStatus;

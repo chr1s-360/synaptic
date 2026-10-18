@@ -221,7 +221,7 @@ export default function Page() {
             </span>
           </div>
           <Link
-            href="/"
+            href="/patient-router"
             className="inline-flex items-center gap-1 font-bold text-rose-300 underline hover:text-white whitespace-nowrap ml-4 transition-colors"
           >
             Go to ER Router &rarr;
@@ -236,7 +236,7 @@ export default function Page() {
             <SynapticLogo className="h-10 w-auto text-white" />
             <div className="hidden sm:flex items-center gap-3 border-l border-slate-800 pl-3">
               <Link
-                href="/"
+                href="/patient-router"
                 className="text-xs text-slate-400 font-medium block leading-tight hover:text-slate-200 transition-colors"
               >
                 Emergency Hospital Router
@@ -244,12 +244,6 @@ export default function Page() {
               <span className="text-xs text-indigo-400 font-semibold block leading-tight">
                 Specialist Directory
               </span>
-              <Link
-                href="/hospital-portal"
-                className="text-xs text-slate-400 font-medium block leading-tight hover:text-slate-200 transition-colors"
-              >
-                Hospital Portal
-              </Link>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -257,7 +251,7 @@ export default function Page() {
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               Accepting Referrals
             </div>
-            <Link href="/">
+            <Link href="/patient-router">
               <Button variant="outline" size="sm" className="text-xs bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white">
                 Back to Map
               </Button>
@@ -314,8 +308,8 @@ export default function Page() {
                     type="button"
                     onClick={() => setSelectedCategory(cat.value)}
                     className={`px-2.5 py-1 rounded-md border font-medium transition ${selectedCategory === cat.value
-                        ? "bg-purple-600 text-white border-purple-500 shadow-sm"
-                        : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
+                      ? "bg-purple-600 text-white border-purple-500 shadow-sm"
+                      : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
                       }`}
                   >
                     {cat.label}
@@ -336,7 +330,7 @@ export default function Page() {
                     >
                       {selectedLanguages.length > 0
                         ? (selectedLanguages.length > 2 ? selectedLanguages.slice(0, 2).join(", ").concat(", ...")
-                        : selectedLanguages.join(", "))
+                          : selectedLanguages.join(", "))
                         : "All Languages"}
                       <ChevronDown className="h-3 w-3" />
                     </Button>
@@ -380,9 +374,9 @@ export default function Page() {
                               checked
                                 ? [...currentLanguages, availableLanguage]
                                 : currentLanguages.filter(
-                                    (selectedLanguage) =>
-                                      selectedLanguage !== availableLanguage
-                                  )
+                                  (selectedLanguage) =>
+                                    selectedLanguage !== availableLanguage
+                                )
                             );
                           }}
                         >

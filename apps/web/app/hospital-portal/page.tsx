@@ -143,7 +143,7 @@ export default function HospitalPortalPage() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Link
-                            href="/"
+                            href="/patient-router"
                             className="flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors"
                         >
                             <ArrowLeft className="w-4 h-4" />
@@ -160,8 +160,8 @@ export default function HospitalPortalPage() {
                         <button
                             onClick={() => setAutoRefresh(!autoRefresh)}
                             className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-all ${autoRefresh
-                                    ? "border-emerald-700/60 bg-emerald-950/60 text-emerald-300"
-                                    : "border-slate-800 bg-slate-900 text-slate-400"
+                                ? "border-emerald-700/60 bg-emerald-950/60 text-emerald-300"
+                                : "border-slate-800 bg-slate-900 text-slate-400"
                                 }`}
                         >
                             <Radio className={`w-3 h-3 ${autoRefresh ? "animate-pulse text-emerald-400" : ""}`} />
@@ -376,12 +376,12 @@ export default function HospitalPortalPage() {
                                                 <td className="px-6 py-4">
                                                     <span
                                                         className={`inline-block px-2 py-0.5 text-xs font-semibold rounded ${t.status === "incoming" || t.status === "inbound"
-                                                                ? "bg-sky-950 text-sky-300 border border-sky-800"
-                                                                : t.status === "arrived"
-                                                                    ? "bg-amber-950 text-amber-300 border border-amber-800"
-                                                                    : t.status === "triaged"
-                                                                        ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
-                                                                        : "bg-slate-800 text-slate-300 border border-slate-700"
+                                                            ? "bg-sky-950 text-sky-300 border border-sky-800"
+                                                            : t.status === "arrived"
+                                                                ? "bg-amber-950 text-amber-300 border border-amber-800"
+                                                                : t.status === "triaged"
+                                                                    ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
+                                                                    : "bg-slate-800 text-slate-300 border border-slate-700"
                                                             }`}
                                                     >
                                                         {t.status.toUpperCase()}
