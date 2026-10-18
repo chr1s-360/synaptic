@@ -4,13 +4,6 @@ import { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@ui/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@ui/components/ui/dropdown-menu";
 import { Input } from "@ui/components/ui/input";
 import { SynapticLogo } from "./logo";
 import InteractiveMap, { FacilityMarker } from "./map";
@@ -32,7 +25,6 @@ import {
   ExternalLink,
   Layers,
   Loader2,
-  ChevronDown,
 } from "lucide-react";
 
 interface HospitalItem {
@@ -51,11 +43,18 @@ interface HospitalItem {
   lng: number;
 }
 
-const FACILITY_TYPE_OPTIONS = [
-  { value: "all", label: "Facility" },
-  { value: "hospital", label: "Hospital" },
-  { value: "pharmacy", label: "Pharmacy" },
-] as const;
+interface PharmacyItem {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  distanceMiles: number;
+  driveTimeMin: number;
+  waitTimeMin: number;
+  rating: number;
+  lat: number;
+  lng: number;
+}
 
 const SAMPLE_HOSPITALS: HospitalItem[] = [
   {
@@ -150,6 +149,34 @@ const SAMPLE_HOSPITALS: HospitalItem[] = [
   },
 ];
 
+const SAMPLE_PHARMACIES: PharmacyItem [] = [
+  {
+    id: "7",
+    name: "Pharmcare Centre",
+    address: "200 Church Street, Toronto, ON M9N1N8",
+    phone: "(416) 245-1221",
+    distanceMiles: 3.1,
+    driveTimeMin: 20,
+    waitTimeMin: 15,
+    rating: 4.7,
+    lat: -79.5102,
+    lng: -43.7093,
+  },
+
+  {
+    id: "8",
+    name: "Loblaw Pharmacy #2809",
+    address: "1775 Brimley Road, Scarborough, ON M1P0A3",
+    phone: "(416) 230-3643",
+    distanceMiles: 6.5,
+    driveTimeMin: 30,
+    waitTimeMin: 10,
+    rating: 4.7,
+    lat: -79.2633,
+    lng: 43.7781,
+  }
+]
+
 export default function Page() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -188,6 +215,12 @@ export default function Page() {
   // Fetch real facilities from the 11,625-row healthcare CSV via router parameters
   useEffect(() => {
     let ignore = false;
+
+    if (severityFilter === "pharmacy") {
+      setLoading(false);
+      return;
+    }
+
     async function fetchFacilities() {
       setLoading(true);
       try {
@@ -223,6 +256,28 @@ export default function Page() {
       clearTimeout(timer);
     };
   }, [searchQuery, severityFilter, sortBy]);
+
+  const filteredPharmacies = SAMPLE_PHARMACIES
+    .filter((pharmacy) => {
+      const query = searchQuery.trim().toLowerCase();
+      return (
+        pharmacy.name.toLowerCase().includes(query) ||
+        pharmacy.address.toLowerCase().includes(query)
+      );
+    })
+    .sort((a, b) => {
+      if (sortBy === "waitTime") {
+        return a.waitTimeMin - b.waitTimeMin;
+      }
+      if (sortBy === "driveTime") {
+        return a.driveTimeMin - b.driveTimeMin;
+      }
+      return (
+        a.driveTimeMin +
+        a.waitTimeMin -
+        (b.driveTimeMin + b.waitTimeMin)
+      );
+    });
 
   const bestChoice = hospitals[0];
 
@@ -316,54 +371,28 @@ export default function Page() {
                 <span className="text-slate-400 font-medium flex items-center gap-1 mr-1">
                   <SlidersHorizontal className="h-3 w-3" /> Filters:
                 </span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-auto gap-1.5 rounded-md border-slate-800 bg-slate-950 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-slate-800 hover:text-white"
-                    >
-                      {FACILITY_TYPE_OPTIONS.find(
-                        (option) => option.value === severityFilter
-                      )?.label ?? "Facility Type"}
-                      <ChevronDown className="h-3 w-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuRadioGroup
-                      value={
-                        FACILITY_TYPE_OPTIONS.some(
-                          (option) => option.value === severityFilter
-                        )
-                          ? severityFilter
-                          : ""
-                      }
-                      onValueChange={(value) => {
-                        const selectedOption = FACILITY_TYPE_OPTIONS.find(
-                          (option) => option.value === value
-                        );
-                        if (selectedOption) {
-                          setSeverityFilter(selectedOption.value);
-                          updateRoute(searchQuery, selectedOption.value, sortBy);
-                        }
-                      }}
-                    >
-                      {FACILITY_TYPE_OPTIONS.map((option) => (
-                        <DropdownMenuRadioItem
-                          key={option.value}
-                          value={option.value}
-                        >
-                          {option.label}
-                        </DropdownMenuRadioItem>
-                      ))}
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
                 <button
                   type="button"
                   onClick={() => {
-                    setSeverityFilter("level1");
-                    updateRoute(searchQuery, "level1", sortBy);
+                    const nextFilter =
+                      severityFilter === "pharmacy" ? "all" : "pharmacy";
+                    setSeverityFilter(nextFilter);
+                    updateRoute(searchQuery, nextFilter, sortBy);
+                  }}
+                  className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "pharmacy"
+                    ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
+                    : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
+                    }`}
+                >
+                  Pharmacy
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextFilter =
+                      severityFilter === "level1" ? "all" : "level1";
+                    setSeverityFilter(nextFilter);
+                    updateRoute(searchQuery, nextFilter, sortBy);
                   }}
                   className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "level1"
                     ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
@@ -375,8 +404,10 @@ export default function Page() {
                 <button
                   type="button"
                   onClick={() => {
-                    setSeverityFilter("pediatric");
-                    updateRoute(searchQuery, "pediatric", sortBy);
+                    const nextFilter =
+                      severityFilter === "pediatric" ? "all" : "pediatric";
+                    setSeverityFilter(nextFilter);
+                    updateRoute(searchQuery, nextFilter, sortBy);
                   }}
                   className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "pediatric"
                     ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
@@ -412,7 +443,7 @@ export default function Page() {
       {/* Main Content Area */}
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
         {/* Recommended Best Option Spotlight Banner */}
-        {bestChoice && (
+        {severityFilter !== "pharmacy" && bestChoice && (
           <div className="bg-gradient-to-r from-emerald-950/40 via-slate-900 to-indigo-950/40 border border-emerald-500/40 rounded-2xl p-5 sm:p-6 shadow-xl backdrop-blur-md">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div className="space-y-1">
@@ -574,14 +605,97 @@ export default function Page() {
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <Building2 className="h-4 w-4 text-indigo-400" />
-              Healthcare Facilities Found ({hospitals.length} of {totalDatasetCount})
-              {loading && <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />}
+              {severityFilter === "pharmacy"
+                ? `Pharmacies Found (${filteredPharmacies.length} of ${SAMPLE_PHARMACIES.length})`
+                : `Healthcare Facilities Found (${hospitals.length} of ${totalDatasetCount})`}
+              {loading && severityFilter !== "pharmacy" && (
+                <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
+              )}
             </h3>
-            <span className="text-xs text-slate-400">Live triage metrics from Ontario dataset</span>
+            <span className="text-xs text-slate-400">
+              {severityFilter === "pharmacy"
+                ? "Pharmacy locations"
+                : "Live triage metrics from Ontario dataset"}
+            </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {hospitals.map((hospital, idx) => {
+            {severityFilter === "pharmacy"
+              ? filteredPharmacies.map((pharmacy) => {
+                  const totalMin = pharmacy.driveTimeMin + pharmacy.waitTimeMin;
+
+                  return (
+                    <div
+                      key={pharmacy.id}
+                      className="bg-slate-900/90 rounded-2xl border border-slate-800 p-5 transition hover:shadow-xl space-y-4"
+                    >
+                      <div>
+                        <h4 className="font-bold text-white text-base">
+                          {pharmacy.name}
+                        </h4>
+                        <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                          <MapPin className="h-3 w-3 text-slate-500" />
+                          {pharmacy.address} • {pharmacy.distanceMiles} miles away
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 text-center">
+                        <div>
+                          <span className="text-[11px] text-slate-400 block flex items-center justify-center gap-1">
+                            <Car className="h-3 w-3 text-blue-400" /> Driving
+                          </span>
+                          <span className="text-sm font-bold text-slate-200">
+                            {pharmacy.driveTimeMin} mins
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[11px] text-slate-400 block flex items-center justify-center gap-1">
+                            <Clock className="h-3 w-3 text-amber-400" /> Wait
+                          </span>
+                          <span className="text-sm font-bold text-slate-200">
+                            {pharmacy.waitTimeMin} mins
+                          </span>
+                        </div>
+                        <div className="border-l border-slate-800">
+                          <span className="text-[11px] text-slate-400 font-medium block">
+                            Total Time
+                          </span>
+                          <span className="text-sm font-extrabold text-white">
+                            {totalMin} mins
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 flex items-center gap-2 border-t border-slate-800/80">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 text-xs gap-1.5 h-9 bg-slate-950 hover:bg-slate-800 border-slate-800 text-slate-300"
+                          onClick={() => alert(`Calling pharmacy: ${pharmacy.phone}`)}
+                        >
+                          <PhoneCall className="h-3.5 w-3.5 text-slate-400" />
+                          {pharmacy.phone}
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="flex-1 text-xs gap-1.5 h-9 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold"
+                          onClick={() =>
+                            window.open(
+                              `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+                                pharmacy.name + " " + pharmacy.address
+                              )}`,
+                              "_blank"
+                            )
+                          }
+                        >
+                          <Navigation className="h-3.5 w-3.5" />
+                          Directions
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })
+              : hospitals.map((hospital, idx) => {
               const totalMin = hospital.driveTimeMin + hospital.waitTimeMin;
               const isBest = idx === 0;
 
