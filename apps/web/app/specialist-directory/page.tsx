@@ -7,6 +7,13 @@ import { Button } from "@ui/components/ui/button";
 import { Input } from "@ui/components/ui/input";
 import { SynapticLogo } from "../logo";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@ui/components/ui/dropdown-menu";
+import {
   Clock,
   Car,
   Navigation,
@@ -22,6 +29,7 @@ import {
   BadgeCheck,
   Stethoscope,
   CheckCircle2,
+  ChevronDown,
   Calendar,
   Sparkles,
 } from "lucide-react";
@@ -165,10 +173,13 @@ const VERIFIED_SPECIALISTS: SpecialistPhysician[] = [
   },
 ];
 
+const AVAILABLE_LANGUAGES = ["English", "French", "Hindi", "Mandarin", "Persian"];
+
 export default function Page() {
   const searchParams = useSearchParams();
   const initialSearch = searchParams.get("search") || searchParams.get("query") || "";
-
+  const [languageSearch, setLanguageSearch] = useState("");
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
@@ -190,10 +201,13 @@ export default function Page() {
         s.category.toLowerCase().includes(q);
 
       const matchesCat = selectedCategory === "all" || s.category.toLowerCase() === selectedCategory.toLowerCase();
+      const matchesLanguage =
+        selectedLanguages.length === 0 ||
+        s.languages.some((language) => selectedLanguages.includes(language));
 
-      return matchesSearch && matchesCat;
+      return matchesSearch && matchesCat && matchesLanguage;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, selectedLanguages]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -301,6 +315,76 @@ export default function Page() {
                     {cat.label}
                   </button>
                 ))}
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-slate-400 font-medium flex items-center gap-1 mr-1">
+                  <SlidersHorizontal className="h-3 w-3" /> Languages:
+                </span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-auto gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium"
+                      aria-label={`Language filters: ${selectedLanguages.length > 0 ? selectedLanguages.join(", ") : "All Languages"}`}
+                    >
+                      {selectedLanguages.length > 0
+                        ? (selectedLanguages.length > 2 ? selectedLanguages.slice(0, 2).join(", ").concat(", ...")
+                        : selectedLanguages.join(", "))
+                        : "All Languages"}
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <div
+                      className="p-1"
+                      onKeyDown={(event) => event.stopPropagation()}
+                    >
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                        <Input
+                          value={languageSearch}
+                          onChange={(event) =>
+                            setLanguageSearch(event.target.value)
+                          }
+                          placeholder="Search languages..."
+                          aria-label="Search languages"
+                          className="h-8 pl-8 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <DropdownMenuItem
+                      onSelect={() => setSelectedLanguages([])}
+                    >
+                      All Languages
+                    </DropdownMenuItem>
+                    {AVAILABLE_LANGUAGES
+                      .filter((availableLanguage) =>
+                        availableLanguage
+                          .toLowerCase()
+                          .includes(languageSearch.trim().toLowerCase())
+                      )
+                      .map((availableLanguage) => (
+                        <DropdownMenuCheckboxItem
+                          key={availableLanguage}
+                          className="pl-2 pr-8 [&>span]:left-auto [&>span]:right-2"
+                          checked={selectedLanguages.includes(availableLanguage)}
+                          onCheckedChange={(checked) => {
+                            setSelectedLanguages((currentLanguages) =>
+                              checked
+                                ? [...currentLanguages, availableLanguage]
+                                : currentLanguages.filter(
+                                    (selectedLanguage) =>
+                                      selectedLanguage !== availableLanguage
+                                  )
+                            );
+                          }}
+                        >
+                          {availableLanguage}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </div>
