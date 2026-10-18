@@ -201,11 +201,13 @@ export default function Page() {
         s.category.toLowerCase().includes(q);
 
       const matchesCat = selectedCategory === "all" || s.category.toLowerCase() === selectedCategory.toLowerCase();
-      const includesLanguage = selectedLanguages
+      const matchesLanguage =
+        selectedLanguages.length === 0 ||
+        s.languages.some((language) => selectedLanguages.includes(language));
 
-      return matchesSearch && matchesCat;
+      return matchesSearch && matchesCat && matchesLanguage;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, selectedLanguages]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
