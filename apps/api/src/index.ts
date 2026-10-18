@@ -13,7 +13,9 @@ import client from "database";
  */
 
 const app = new Hono();
-const PORT = 3000;
+// Defaults to 3000 (Docker maps it to host port 3001). Set PORT=3001 when running locally
+// so it doesn't collide with the Next.js dev server on 3000.
+const PORT = Number(process.env.PORT ?? 3000);
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -95,13 +97,22 @@ app.post("/api/inbound", async (c) => {
     );
   }
 
-  // Save the ticket in the database.
+  // Optional, non-identifying routing context
+  const optionalInt = (value: unknown) =>
+    Number.isInteger(value) && (value as number) >= 0 ? (value as number) : undefined;
+  const optionalFloat = (value: unknown) =>
+    typeof value === "number" && Number.isFinite(value) ? value : undefined;
+
+  // Save the ticket in the database (no patient-identifying data is stored).
   const ticket = await client.inboundTicket.create({
     data: {
       hospitalId,
       chiefComplaint,
       patientAge,
       selfReportedSeverity,
+      etaMinutes: optionalInt(body.etaMinutes),
+      latitude: optionalFloat(body.latitude),
+      longitude: optionalFloat(body.longitude),
     },
   });
 
@@ -137,9 +148,9 @@ app.post("/api/specialists", async (c) => {
 
   const languages: string[] = Array.isArray(body.languages)
     ? body.languages
-        .filter((language: unknown) => typeof language === "string")
-        .map((language: string) => language.trim())
-        .filter((language: string) => language.length > 0)
+      .filter((language: unknown) => typeof language === "string")
+      .map((language: string) => language.trim())
+      .filter((language: string) => language.length > 0)
     : [];
 
   const acceptingNewPatients = body.acceptingNewPatients ?? true;
@@ -191,11 +202,11 @@ app.get("/api/specialists", async (c) => {
     where: {
       ...(search
         ? {
-            displayName: {
-              contains: search,
-              mode: "insensitive",
-            },
-          }
+          displayName: {
+            contains: search,
+            mode: "insensitive",
+          },
+        }
         : {}),
       ...(specialty ? { specialty } : {}),
       ...(language ? { languages: { has: language } } : {}),
@@ -299,4 +310,6 @@ app.delete("/users/:id", async (c) => {
   return c.json(user);
 });
 
-serve({ fetch: app.fetch, port: Number(PORT) });
+serve({ fetch: app.fetch, port: Number(PORT) }, (info) => {
+  console.log(`🚀 API server is running on http://localhost:${info.port}`);
+});
