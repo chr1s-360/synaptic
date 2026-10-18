@@ -77,13 +77,6 @@ function stripAsterisks(text: string): string {
     return text.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\*([^*]+)\*/g, "$1");
 }
 
-const PRESET_QUERIES = [
-    "My son's ear is hurting, doctor said go to specialist. What are next steps?",
-    "Sudden severe chest pressure and shortness of breath",
-    "Deep cut on finger needing stitches, looking for lowest wait time",
-    "Child has fever and rash, who should we see?",
-];
-
 export default function AiHealthcareNavigator() {
     const [isOpen, setIsOpen] = useState(false);
     const [input, setInput] = useState("");
@@ -92,7 +85,7 @@ export default function AiHealthcareNavigator() {
         {
             id: "welcome-1",
             sender: "ai",
-            text: "Hello! I am your Synaptic AI Healthcare Navigator.\n\nDescribe your symptoms, who needs care, or ask about specialist referrals. I calculate personalized plans balancing live traffic travel times, hospital ER queues, and our specialist directory.",
+            text: "Hello! I am your Synaptic AI Healthcare Navigator.\n\nPlease describe your symptoms, what you or your patient are experiencing, or ask for specialist/clinic recommendations. I will evaluate your situation using Google Gemini and calculate your most optimized care plan.",
             timestamp: "Just now",
         },
     ]);
@@ -460,33 +453,12 @@ export default function AiHealthcareNavigator() {
                         {loading && (
                             <div className="flex items-center gap-2 p-3 bg-slate-900 border border-slate-800 rounded-2xl w-fit text-xs text-slate-300 shadow-sm animate-pulse">
                                 <Sparkles className="w-4 h-4 text-indigo-400 animate-spin" />
-                                <span>Optimizing routes, live traffic delays & ER wait queues...</span>
+                                <span>Evaluating symptoms with Gemini AI & live emergency queues...</span>
                             </div>
                         )}
 
                         <div ref={messagesEndRef} />
                     </div>
-
-                    {/* Presets if only welcome message exists */}
-                    {messages.length === 1 && (
-                        <div className="p-3 bg-slate-950 border-t border-slate-800/90 space-y-1.5">
-                            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                                Quick Sample Inquiries:
-                            </p>
-                            <div className="flex flex-col gap-1.5">
-                                {PRESET_QUERIES.map((q, idx) => (
-                                    <button
-                                        key={idx}
-                                        onClick={() => handleSend(q)}
-                                        className="text-left text-xs text-slate-300 hover:text-indigo-400 hover:bg-slate-900 p-2 rounded-lg border border-slate-800/90 hover:border-indigo-500/50 transition flex items-center justify-between group"
-                                    >
-                                        <span className="truncate">{q}</span>
-                                        <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-indigo-400 shrink-0" />
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
 
                     {/* Chat Input Field */}
                     <form

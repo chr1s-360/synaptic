@@ -464,8 +464,8 @@ export default function Page() {
                   type="button"
                   onClick={() => setMapMode("interactive")}
                   className={`px-3 py-1 font-medium rounded-md transition ${mapMode === "interactive"
-                      ? "bg-indigo-600 text-white shadow-xs"
-                      : "text-slate-400 hover:text-white"
+                    ? "bg-indigo-600 text-white shadow-xs"
+                    : "text-slate-400 hover:text-white"
                     }`}
                 >
                   Native Interactive Map
@@ -474,8 +474,8 @@ export default function Page() {
                   type="button"
                   onClick={() => setMapMode("streamlit")}
                   className={`px-3 py-1 font-medium rounded-md transition ${mapMode === "streamlit"
-                      ? "bg-indigo-600 text-white shadow-xs"
-                      : "text-slate-400 hover:text-white"
+                    ? "bg-indigo-600 text-white shadow-xs"
+                    : "text-slate-400 hover:text-white"
                     }`}
                 >
                   Streamlit Routing Hub
