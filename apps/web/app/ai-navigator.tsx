@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import {
     MessageSquare,
     X,
@@ -85,6 +86,7 @@ const PRESET_QUERIES = [
 ];
 
 export default function AiHealthcareNavigator() {
+    const pathname = usePathname();
     const [isOpen, setIsOpen] = useState(false);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
@@ -176,6 +178,11 @@ export default function AiHealthcareNavigator() {
             },
         ]);
     };
+
+    // Hide the AI triage chatbot on hospital staff pages
+    if (pathname?.startsWith("/hospital-portal")) {
+        return null;
+    }
 
     return (
         <>

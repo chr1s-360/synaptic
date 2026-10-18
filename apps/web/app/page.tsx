@@ -287,7 +287,6 @@ export default function Page() {
   const bestChoice = hospitals[0];
 
   // ---------- Patient intake -> inbound ticket ----------
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
   const SEVERITY_LEVELS = [
     { value: 1, label: "1 · Minor" },
     { value: 2, label: "2 · Mild" },
@@ -333,7 +332,7 @@ export default function Page() {
     try {
       // Name, phone and email are collected for the patient only — they are NOT sent
       // or stored. The ticket carries just what the hospital needs to gauge incoming traffic.
-      const res = await fetch(`${API_BASE}/api/inbound`, {
+      const res = await fetch("/api/inbound", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -391,6 +390,12 @@ export default function Page() {
                 className="text-xs text-slate-400 font-medium block leading-tight hover:text-slate-200 transition-colors"
               >
                 Specialist Directory
+              </Link>
+              <Link
+                href="/hospital-portal"
+                className="text-xs text-indigo-400 font-medium block leading-tight hover:text-indigo-300 transition-colors"
+              >
+                Hospital Portal
               </Link>
             </div>
           </div>
@@ -1002,10 +1007,10 @@ export default function Page() {
                           type="button"
                           onClick={() => setIntake({ ...intake, severity: level.value })}
                           className={`rounded-md border px-1 py-2 text-[11px] font-medium transition ${intake.severity === level.value
-                              ? level.value >= 4
-                                ? "bg-rose-600 border-rose-500 text-white"
-                                : "bg-indigo-600 border-indigo-500 text-white"
-                              : "bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800"
+                            ? level.value >= 4
+                              ? "bg-rose-600 border-rose-500 text-white"
+                              : "bg-indigo-600 border-indigo-500 text-white"
+                            : "bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800"
                             }`}
                         >
                           {level.label}
