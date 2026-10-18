@@ -1,12 +1,20 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useRef, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@ui/components/ui/button";
 import { Input } from "@ui/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@ui/components/ui/dialog";
 import { SynapticLogo } from "./logo";
 import InteractiveMap, { FacilityMarker } from "./map";
+import { geocodeCanadianAddress } from "./routing-engine";
 import {
   Clock,
   Car,
@@ -145,12 +153,73 @@ export default function Page() {
   const urlSort = (searchParams.get("sortBy") as any) || "totalTime";
 
   const [searchQuery, setSearchQuery] = useState(urlQuery);
-  const [userLocation, setUserLocation] = useState("Toronto, ON (detected)");
+  const mapSectionRef = useRef<HTMLElement | null>(null);
+  const resultsBannerRef = useRef<HTMLDivElement | null>(null);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Scroll to the recommended-hospital banner so the full hospital text and the map below are visible
+    (resultsBannerRef.current ?? mapSectionRef.current)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+  const [userLocation, setUserLocation] = useState("Toronto, ON (default)");
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number; label: string }>({
     lat: 43.6532,
     lng: -79.3832,
-    label: "Current Location (Toronto City Hall)",
+    label: "Default Location (Toronto City Hall)",
   });
+  // Routing waits until the browser location prompt has been answered
+  const [locationStatus, setLocationStatus] = useState<"pending" | "granted" | "denied" | "manual">("pending");
+  const [addressInput, setAddressInput] = useState("");
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
+
+  const handleManualLocation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = addressInput.trim();
+    if (!query) return;
+
+    setIsGeocoding(true);
+    setGeocodeError(null);
+    try {
+      const geo = await geocodeCanadianAddress(query);
+      const label = geo.displayName.split(",").slice(0, 3).join(",").trim();
+      setUserCoords({ lat: geo.lat, lng: geo.lng, label });
+      setUserLocation(label);
+      setLocationStatus("manual");
+    } catch (err: any) {
+      setGeocodeError(err?.message || "Could not find that location");
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  const requestLocation = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocationStatus("denied");
+      return;
+    }
+    setLocationStatus("pending");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserCoords({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          label: "Your Current Location",
+        });
+        setUserLocation("Your current location");
+        setLocationStatus("granted");
+      },
+      () => setLocationStatus("denied"),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  };
+
+  useEffect(() => {
+    requestLocation();
+  }, []);
 
   const [hospitals, setHospitals] = useState<HospitalItem[]>(SAMPLE_HOSPITALS);
   const [selectedHospitalId, setSelectedHospitalId] = useState<string>("3");
@@ -168,11 +237,14 @@ export default function Page() {
     if (newQuery) params.set("query", newQuery);
     if (newFilter && newFilter !== "all") params.set("filter", newFilter);
     if (newSort && newSort !== "totalTime") params.set("sortBy", newSort);
-    router.replace(`/?${params.toString()}`, { scroll: false });
+    router.replace(`/?${params.toString()}`);
   };
 
-  // Fetch real facilities from the 11,625-row healthcare CSV via router parameters
+  // Fetch real facilities from the healthcare dataset via router parameters
   useEffect(() => {
+    // Don't route until the user has answered the location prompt
+    if (locationStatus === "pending") return;
+
     let ignore = false;
     async function fetchFacilities() {
       setLoading(true);
@@ -181,6 +253,8 @@ export default function Page() {
         if (searchQuery.trim()) params.set("query", searchQuery.trim());
         if (severityFilter !== "all") params.set("filter", severityFilter);
         params.set("sortBy", sortBy);
+        params.set("lat", userCoords.lat.toString());
+        params.set("lng", userCoords.lng.toString());
         params.set("limit", "100");
 
         const res = await fetch(`/api/facilities?${params.toString()}`);
@@ -194,7 +268,7 @@ export default function Page() {
           }
         }
       } catch (err) {
-        console.warn("Failed loading live CSV facilities, using fallback:", err);
+        console.warn("Failed loading live facilities, using fallback:", err);
       } finally {
         if (!ignore) setLoading(false);
       }
@@ -208,10 +282,78 @@ export default function Page() {
       ignore = true;
       clearTimeout(timer);
     };
-  }, [searchQuery, severityFilter, sortBy]);
+  }, [searchQuery, severityFilter, sortBy, userCoords.lat, userCoords.lng, locationStatus]);
 
   const bestChoice = hospitals[0];
 
+  // ---------- Patient intake -> inbound ticket ----------
+  const SEVERITY_LEVELS = [
+    { value: 1, label: "1 · Minor" },
+    { value: 2, label: "2 · Mild" },
+    { value: 3, label: "3 · Moderate" },
+    { value: 4, label: "4 · Severe" },
+    { value: 5, label: "5 · Critical" },
+  ];
+  const EMPTY_INTAKE = { name: "", phone: "", email: "", age: "", symptoms: "", severity: 3 };
+
+  const [ticketHospital, setTicketHospital] = useState<HospitalItem | null>(null);
+  const [intake, setIntake] = useState(EMPTY_INTAKE);
+  const [ticketSubmitting, setTicketSubmitting] = useState(false);
+  const [ticketError, setTicketError] = useState<string | null>(null);
+  const [ticketSent, setTicketSent] = useState(false);
+
+  const openTicketForm = (hospital: HospitalItem) => {
+    setSelectedHospitalId(hospital.id);
+    setTicketHospital(hospital);
+    setTicketError(null);
+    setTicketSent(false);
+  };
+
+  const closeTicketForm = () => {
+    setTicketHospital(null);
+    setTicketError(null);
+    if (ticketSent) setIntake(EMPTY_INTAKE);
+    setTicketSent(false);
+  };
+
+  const handleTicketSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ticketHospital) return;
+
+    const age = Number(intake.age);
+    if (!intake.name.trim()) return setTicketError("Please enter your name.");
+    if (!intake.phone.trim()) return setTicketError("Please enter a phone number.");
+    if (!/^\S+@\S+\.\S+$/.test(intake.email.trim())) return setTicketError("Please enter a valid email.");
+    if (!Number.isInteger(age) || age < 0 || age > 130) return setTicketError("Age must be a whole number from 0 to 130.");
+    if (!intake.symptoms.trim()) return setTicketError("Please describe your symptoms.");
+
+    setTicketSubmitting(true);
+    setTicketError(null);
+    try {
+      // Name, phone and email are collected for the patient only — they are NOT sent
+      // or stored. The ticket carries just what the hospital needs to gauge incoming traffic.
+      const res = await fetch("/api/inbound", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hospitalId: ticketHospital.id,
+          chiefComplaint: intake.symptoms.trim(),
+          patientAge: age,
+          selfReportedSeverity: intake.severity,
+          etaMinutes: ticketHospital.driveTimeMin,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || `Request failed (${res.status})`);
+      }
+      setTicketSent(true);
+    } catch (err: any) {
+      setTicketError(err?.message || "Could not send your arrival notice. Please try again.");
+    } finally {
+      setTicketSubmitting(false);
+    }
+  };
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       {/* Top emergency announcement bar */}
@@ -249,6 +391,12 @@ export default function Page() {
               >
                 Specialist Directory
               </Link>
+              <Link
+                href="/hospital-portal"
+                className="text-xs text-slate-400 font-medium block leading-tight hover:text-slate-200 transition-colors"
+              >
+                Hospital Portal
+              </Link>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -280,7 +428,7 @@ export default function Page() {
 
           {/* Location & Quick Search Controls */}
           <div className="bg-slate-900/90 p-3 sm:p-4 rounded-2xl shadow-2xl border border-slate-800 max-w-2xl mx-auto mt-6 space-y-3 text-left backdrop-blur-xl">
-            <div className="flex flex-col sm:flex-row gap-2">
+            <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
                 <Input
@@ -294,7 +442,13 @@ export default function Page() {
                   className="pl-9 h-11 text-sm bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:ring-indigo-500"
                 />
               </div>
-            </div>
+              <Button
+                type="submit"
+                className="h-11 px-5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold"
+              >
+                Search
+              </Button>
+            </form>
 
             {/* Filter pills & sort selectors */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs">
@@ -302,32 +456,6 @@ export default function Page() {
                 <span className="text-slate-400 font-medium flex items-center gap-1 mr-1">
                   <SlidersHorizontal className="h-3 w-3" /> Filters:
                 </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSeverityFilter("all");
-                    updateRoute(searchQuery, "all", sortBy);
-                  }}
-                  className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "all"
-                    ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
-                    : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
-                    }`}
-                >
-                  All Facilities
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSeverityFilter("hospital");
-                    updateRoute(searchQuery, "hospital", sortBy);
-                  }}
-                  className={`px-2.5 py-1 rounded-md border font-medium transition ${severityFilter === "hospital"
-                    ? "bg-indigo-600 text-white border-indigo-500 shadow-sm"
-                    : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
-                    }`}
-                >
-                  Hospitals Only
-                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -380,9 +508,55 @@ export default function Page() {
 
       {/* Main Content Area */}
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-6">
+        {/* Location status & manual entry */}
+        <div className="bg-amber-950/40 border border-amber-700/50 text-amber-200 rounded-xl px-4 py-3 text-xs sm:text-sm space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <span className="flex items-center gap-2">
+              <Compass className="h-4 w-4 shrink-0 text-amber-400" />
+              {locationStatus === "pending"
+                ? "Waiting for your location permission — or enter your location below."
+                : locationStatus === "denied"
+                  ? `Location unavailable — routing from ${userLocation}. Enter your location below for accurate travel times.`
+                  : `Routing from ${userLocation}`}
+            </span>
+            {locationStatus !== "granted" && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={requestLocation}
+                className="text-xs bg-slate-900 border-amber-700/60 text-amber-200 hover:bg-slate-800"
+              >
+                Use my location
+              </Button>
+            )}
+          </div>
+
+          <form onSubmit={handleManualLocation} className="flex flex-col sm:flex-row gap-2">
+            <Input
+              value={addressInput}
+              onChange={(e) => setAddressInput(e.target.value)}
+              placeholder="Enter an address, city or postal code (e.g. 100 Queen St W, Toronto)"
+              className="h-9 text-xs bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500"
+            />
+            <Button
+              type="submit"
+              size="sm"
+              disabled={isGeocoding || !addressInput.trim()}
+              className="h-9 text-xs bg-indigo-600 hover:bg-indigo-500 text-white"
+            >
+              {isGeocoding ? "Locating…" : "Set location"}
+            </Button>
+          </form>
+          {geocodeError && <p className="text-rose-300 text-xs">{geocodeError}</p>}
+        </div>
+
         {/* Recommended Best Option Spotlight Banner */}
         {bestChoice && (
-          <div className="bg-gradient-to-r from-emerald-950/40 via-slate-900 to-indigo-950/40 border border-emerald-500/40 rounded-2xl p-5 sm:p-6 shadow-xl backdrop-blur-md">
+          <div
+            ref={resultsBannerRef}
+            className="scroll-mt-20 bg-gradient-to-r from-emerald-950/40 via-slate-900 to-indigo-950/40 border border-emerald-500/40 rounded-2xl p-5 sm:p-6 shadow-xl backdrop-blur-md"
+          >
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div className="space-y-1">
                 <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-300 bg-emerald-950/80 border border-emerald-700/60 px-2.5 py-0.5 rounded-full">
@@ -418,7 +592,13 @@ export default function Page() {
                 </div>
               </div>
 
-              <div className="w-full md:w-auto">
+              <div className="w-full md:w-auto flex flex-col sm:flex-row gap-2">
+                <Button
+                  className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center justify-center gap-2"
+                  onClick={() => openTicketForm(bestChoice)}
+                >
+                  <ShieldCheck className="h-4 w-4" /> Choose this hospital
+                </Button>
                 <Button
                   className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/40"
                   onClick={() =>
@@ -438,7 +618,10 @@ export default function Page() {
         )}
 
         {/* Interactive Accessibility Map Container */}
-        <section className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
+        <section
+          ref={mapSectionRef}
+          className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl overflow-hidden scroll-mt-20"
+        >
           <div className="p-4 sm:p-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950/70">
             <div className="flex items-center gap-2.5">
               <div className="h-9 w-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-sm">
@@ -628,7 +811,7 @@ export default function Page() {
                   </div>
 
                   {/* Actions */}
-                  <div className="pt-2 flex items-center gap-2 border-t border-slate-800/80">
+                  <div className="pt-2 flex flex-wrap items-center gap-2 border-t border-slate-800/80">
                     <Button
                       variant="outline"
                       size="sm"
@@ -652,6 +835,14 @@ export default function Page() {
                     >
                       <Navigation className="h-3.5 w-3.5" />
                       Directions
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="w-full text-xs gap-1.5 h-9 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
+                      onClick={() => openTicketForm(hospital)}
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      Choose this hospital
                     </Button>
                   </div>
                 </div>
@@ -681,6 +872,152 @@ export default function Page() {
           </div>
         </section>
       </main>
+
+      {/* Patient intake dialog -> inbound ticket */}
+      <Dialog open={!!ticketHospital} onOpenChange={(open) => !open && closeTicketForm()}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-h-[90vh] overflow-y-auto">
+          {ticketHospital && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-white">{ticketHospital.name}</DialogTitle>
+                <DialogDescription className="text-slate-400">{ticketHospital.address}</DialogDescription>
+              </DialogHeader>
+
+              {/* Calculated wait time */}
+              <div className="grid grid-cols-3 gap-2 bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-center">
+                <div>
+                  <span className="text-[11px] text-slate-400 block">Drive</span>
+                  <span className="text-sm font-bold text-blue-400">{ticketHospital.driveTimeMin} min</span>
+                </div>
+                <div>
+                  <span className="text-[11px] text-slate-400 block">Estimated ER wait</span>
+                  <span className="text-sm font-bold text-amber-400">{ticketHospital.waitTimeMin} min</span>
+                </div>
+                <div>
+                  <span className="text-[11px] text-slate-400 block">Total to care</span>
+                  <span className="text-sm font-extrabold text-emerald-400">
+                    {ticketHospital.driveTimeMin + ticketHospital.waitTimeMin} min
+                  </span>
+                </div>
+              </div>
+
+              {ticketSent ? (
+                <div className="space-y-4">
+                  <div className="bg-emerald-950/40 border border-emerald-700/50 text-emerald-200 rounded-xl p-4 text-sm">
+                    <strong className="block text-emerald-300">Arrival notice sent</strong>
+                    {ticketHospital.name} has been told to expect a patient in about {ticketHospital.driveTimeMin}{" "}
+                    minutes. Only age, symptoms and severity were shared — no personal contact details.
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white"
+                      onClick={() =>
+                        window.open(
+                          `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
+                            ticketHospital.name + " " + ticketHospital.address
+                          )}`,
+                          "_blank"
+                        )
+                      }
+                    >
+                      <Navigation className="h-4 w-4 mr-1.5" /> Start Directions
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="bg-slate-950 border-slate-800 text-slate-200 hover:bg-slate-800"
+                      onClick={closeTicketForm}
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleTicketSubmit} className="space-y-3">
+                  <Input
+                    value={intake.name}
+                    onChange={(e) => setIntake({ ...intake, name: e.target.value })}
+                    placeholder="Patient name"
+                    className="bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500"
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Input
+                      type="tel"
+                      value={intake.phone}
+                      onChange={(e) => setIntake({ ...intake, phone: e.target.value })}
+                      placeholder="Phone number"
+                      className="bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500"
+                    />
+                    <Input
+                      type="email"
+                      value={intake.email}
+                      onChange={(e) => setIntake({ ...intake, email: e.target.value })}
+                      placeholder="Email"
+                      className="bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500"
+                    />
+                  </div>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={130}
+                    value={intake.age}
+                    onChange={(e) => setIntake({ ...intake, age: e.target.value })}
+                    placeholder="Age"
+                    className="bg-slate-950 border-slate-800 text-slate-100 placeholder-slate-500"
+                  />
+                  <textarea
+                    value={intake.symptoms}
+                    onChange={(e) => setIntake({ ...intake, symptoms: e.target.value })}
+                    placeholder="Describe your symptoms"
+                    rows={3}
+                    className="w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+
+                  <div className="space-y-1.5">
+                    <span className="text-xs font-medium text-slate-300">How severe are your symptoms?</span>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {SEVERITY_LEVELS.map((level) => (
+                        <button
+                          key={level.value}
+                          type="button"
+                          onClick={() => setIntake({ ...intake, severity: level.value })}
+                          className={`rounded-md border px-1 py-2 text-[11px] font-medium transition ${intake.severity === level.value
+                            ? level.value >= 4
+                              ? "bg-rose-600 border-rose-500 text-white"
+                              : "bg-indigo-600 border-indigo-500 text-white"
+                            : "bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800"
+                            }`}
+                        >
+                          {level.label}
+                        </button>
+                      ))}
+                    </div>
+                    {intake.severity === 5 && (
+                      <p className="text-xs text-rose-300">
+                        Critical? Call 911 instead of driving.
+                      </p>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] text-slate-500">
+                    Your name, phone and email stay private and are not shared with the hospital. Only your age,
+                    symptoms, severity and arrival time are sent so they can plan for incoming traffic.
+                  </p>
+
+                  {ticketError && <p className="text-xs text-rose-300">{ticketError}</p>}
+
+                  <Button
+                    type="submit"
+                    disabled={ticketSubmitting}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
+                  >
+                    {ticketSubmitting ? "Sending…" : "Notify hospital I'm coming"}
+                  </Button>
+                </form>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Footer */}
       <footer className="border-t border-slate-800/80 bg-slate-950 py-8 mt-12 text-center text-xs text-slate-400 space-y-2">
