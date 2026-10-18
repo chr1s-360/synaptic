@@ -293,11 +293,10 @@ export default function Page() {
                     key={cat.value}
                     type="button"
                     onClick={() => setSelectedCategory(cat.value)}
-                    className={`px-2.5 py-1 rounded-md border font-medium transition ${
-                      selectedCategory === cat.value
+                    className={`px-2.5 py-1 rounded-md border font-medium transition ${selectedCategory === cat.value
                         ? "bg-purple-600 text-white border-purple-500 shadow-sm"
                         : "bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200"
-                    }`}
+                      }`}
                   >
                     {cat.label}
                   </button>
